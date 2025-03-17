@@ -545,6 +545,16 @@ void FORD_VFD::charhelper(int index, uint8_t code)
 	}
 }
 
+void FORD_VFD::setsleep(bool en)
+{
+    bool dimmen = !en;
+    if (!dimmen)
+    {
+        memset(gram, 0, sizeof gram);
+        // pt6324_refrash(gram);
+    }
+}
+
 void FORD_VFD::test()
 {
 	xTaskCreate(

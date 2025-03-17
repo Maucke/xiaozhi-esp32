@@ -642,6 +642,10 @@ public:
         _spectrum->inputFFTData(buf, size);
     }
 #endif
+    void SetSubSleep(bool en = true)
+    {
+        setsleep(en);
+    }
 #else
     void SetSubSleep(bool en = true)
     {
@@ -793,6 +797,17 @@ private:
                 show_low_power_warning_ = false;
             }
         }
+#if FORD_VFD_EN
+        if (!charging)
+            display_->symbolhelper(AUX, false);
+        else
+            display_->symbolhelper(AUX, true);
+#else
+        if (!charging)
+            display_->symbolhelper(USB2, false);
+        else
+            display_->symbolhelper(USB2, true);
+#endif
     }
 
     void EnableDeepSleep()
@@ -987,6 +1002,11 @@ private:
         spi_device_handle_t spi_device = nullptr;
 
 #if SUB_DISPLAY_EN
+        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
+        {
+            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
+            gpio_set_level(PIN_NUM_VFD_RE, 1);
+        }
         // Log the initialization process
         ESP_LOGI(TAG, "Initialize VFD SPI bus");
 
@@ -1143,14 +1163,6 @@ private:
             gpio_set_direction(PIN_NUM_VFD_EN, GPIO_MODE_OUTPUT);
             gpio_set_level(PIN_NUM_VFD_EN, 1);
         }
-
-#if ESP_DUAL_DISPLAY_V2
-        pcf8574->writeGpio(TPS_PS, 1);
-        pcf8574->writeGpio(MIC_EN, 1);
-        pcf8574->writeGpio(OLED_EN, 1);
-        pcf8574->writeGpio(VFD_EN, 1);
-        pcf8574->writeGpio(SD_EN, 1);
-#endif
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -1171,25 +1183,25 @@ private:
         };
         ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
 
-        // adc_oneshot_chan_cfg_t bat_config = {
-        //     .atten = ADC_ATTEN_DB_12,
-        //     .bitwidth = ADC_BITWIDTH_12,
-        // };
-        // ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, BAT_ADC_CHANNEL, &bat_config));
+#if !ESP_DUAL_DISPLAY_V2
+        adc_oneshot_chan_cfg_t bat_config = {
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_12,
+        };
+        ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, BAT_ADC_CHANNEL, &bat_config));
 
+        adc_cali_curve_fitting_config_t bat_cali_config = {
+            .unit_id = ADC_UNIT,
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_12,
+        };
+        ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&bat_cali_config, &bat_adc_cali_handle));
+#endif
         adc_oneshot_chan_cfg_t dimm_config = {
             .atten = ADC_ATTEN_DB_12,
             .bitwidth = ADC_BITWIDTH_12,
         };
         ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, DIMM_ADC_CHANNEL, &dimm_config));
-
-        // adc_cali_curve_fitting_config_t bat_cali_config = {
-        //     .unit_id = ADC_UNIT,
-        //     .atten = ADC_ATTEN_DB_12,
-        //     .bitwidth = ADC_BITWIDTH_12,
-        // };
-        // ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&bat_cali_config, &bat_adc_cali_handle));
-
         adc_cali_curve_fitting_config_t dimm_cali_config = {
             .unit_id = ADC_UNIT,
             .atten = ADC_ATTEN_DB_12,
@@ -1250,6 +1262,14 @@ public:
         vTaskDelay(pdMS_TO_TICKS(120));
         InitializeAdc();
         InitializeI2c();
+#if ESP_DUAL_DISPLAY_V2
+        pcf8574->writeGpio(TPS_PS, 1);
+        pcf8574->writeGpio(MIC_EN, 1);
+        pcf8574->writeGpio(OLED_EN, 1);
+        pcf8574->writeGpio(VFD_EN, 1);
+        pcf8574->writeGpio(SD_EN, 1);
+#endif
+        vTaskDelay(pdMS_TO_TICKS(120));
         InitializeDisplay();
         InitializeButtons();
         InitializePowerSaveTimer();
@@ -1411,137 +1431,137 @@ public:
 #define V4_DOWN 2900
 
 #if ESP_DUAL_DISPLAY
-virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
-{
-    static int last_level = 0;
-    static bool last_charging = false;
-    int bat_adc_value;
-    int bat_v = 0;
-    ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, BAT_ADC_CHANNEL, &bat_adc_value));
-    ESP_ERROR_CHECK(adc_cali_raw_to_voltage(bat_adc_cali_handle, bat_adc_value, &bat_v));
-    bat_v *= 2;
-    int new_level;
-    if (bat_v >= VCHARGE)
+    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
     {
-        new_level = last_level;
-        charging = true;
-    }
-    else if (last_level >= 100 && bat_v >= V1_DOWN)
-    {
-        new_level = 100;
-        charging = false;
-    }
-    else if (last_level < 100 && bat_v >= V1_UP)
-    {
-        new_level = 100;
-        charging = false;
-    }
-    else if (last_level >= 75 && bat_v >= V2_DOWN)
-    {
-        new_level = 75;
-        charging = false;
-    }
-    else if (last_level < 75 && bat_v >= V2_UP)
-    {
-        new_level = 75;
-        charging = false;
-    }
-    else if (last_level >= 50 && bat_v >= V3_DOWN)
-    {
-        new_level = 50;
-        charging = false;
-    }
-    else if (last_level < 50 && bat_v >= V3_UP)
-    {
-        new_level = 50;
-        charging = false;
-    }
-    else if (last_level >= 25 && bat_v >= V4_DOWN)
-    {
-        new_level = 25;
-        charging = false;
-    }
-    else if (last_level < 25 && bat_v >= V4_UP)
-    {
-        new_level = 25;
-        charging = false;
-    }
-    else
-    {
-        new_level = 0;
-        charging = false;
-    }
+        static int last_level = 0;
+        static bool last_charging = false;
+        int bat_adc_value;
+        int bat_v = 0;
+        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, BAT_ADC_CHANNEL, &bat_adc_value));
+        ESP_ERROR_CHECK(adc_cali_raw_to_voltage(bat_adc_cali_handle, bat_adc_value, &bat_v));
+        bat_v *= 2;
+        int new_level;
+        if (bat_v >= VCHARGE)
+        {
+            new_level = last_level;
+            charging = true;
+        }
+        else if (last_level >= 100 && bat_v >= V1_DOWN)
+        {
+            new_level = 100;
+            charging = false;
+        }
+        else if (last_level < 100 && bat_v >= V1_UP)
+        {
+            new_level = 100;
+            charging = false;
+        }
+        else if (last_level >= 75 && bat_v >= V2_DOWN)
+        {
+            new_level = 75;
+            charging = false;
+        }
+        else if (last_level < 75 && bat_v >= V2_UP)
+        {
+            new_level = 75;
+            charging = false;
+        }
+        else if (last_level >= 50 && bat_v >= V3_DOWN)
+        {
+            new_level = 50;
+            charging = false;
+        }
+        else if (last_level < 50 && bat_v >= V3_UP)
+        {
+            new_level = 50;
+            charging = false;
+        }
+        else if (last_level >= 25 && bat_v >= V4_DOWN)
+        {
+            new_level = 25;
+            charging = false;
+        }
+        else if (last_level < 25 && bat_v >= V4_UP)
+        {
+            new_level = 25;
+            charging = false;
+        }
+        else
+        {
+            new_level = 0;
+            charging = false;
+        }
 
-    level = new_level;
-    if (level != last_level || charging != last_charging)
-    {
-        last_level = level;
-        last_charging = charging;
-        // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
+        level = new_level;
+        if (level != last_level || charging != last_charging)
+        {
+            last_level = level;
+            last_charging = charging;
+            // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
+        }
+        discharging = !charging;
+        return true;
     }
-    discharging = !charging;
-    return true;
-}
 #elif ESP_DUAL_DISPLAY_V2
-virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
-{
-    static int last_level = 0;
-    int bat_v = ina3221->getBusVoltage(BAT_PW);
-    int new_level;
-    if (last_level >= 100 && bat_v >= V1_DOWN)
+    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
     {
-        new_level = 100;
-    }
-    else if (last_level < 100 && bat_v >= V1_UP)
-    {
-        new_level = 100;
-    }
-    else if (last_level >= 75 && bat_v >= V2_DOWN)
-    {
-        new_level = 75;
-    }
-    else if (last_level < 75 && bat_v >= V2_UP)
-    {
-        new_level = 75;
-    }
-    else if (last_level >= 50 && bat_v >= V3_DOWN)
-    {
-        new_level = 50;
-    }
-    else if (last_level < 50 && bat_v >= V3_UP)
-    {
-        new_level = 50;
-    }
-    else if (last_level >= 25 && bat_v >= V4_DOWN)
-    {
-        new_level = 25;
-    }
-    else if (last_level < 25 && bat_v >= V4_UP)
-    {
-        new_level = 25;
-    }
-    else
-    {
-        new_level = 0;
-    }
-    // testmpu();
-    level = new_level;
-    charging = gpio_get_level(PIN_NUM_VCC_DECT);
-    float crt = ina3221->getCurrent(BAT_PW);
-    if (crt > 0.01)
-        discharging = true;
-    else
-        discharging = false;
+        static int last_level = 0;
+        int bat_v = ina3221->getBusVoltage(BAT_PW) * 1000;
 
-    float voltage = 0.0f, current = 0.0f;
-    for (size_t i = 0; i < 3; i++)
-    {
-        voltage = ina3221->getBusVoltage(i);
-        current = ina3221->getCurrent(i);
-        ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        if (last_level >= 100 && bat_v >= V1_DOWN)
+        {
+            level = 100;
+        }
+        else if (last_level < 100 && bat_v >= V1_UP)
+        {
+            level = 100;
+        }
+        else if (last_level >= 75 && bat_v >= V2_DOWN)
+        {
+            level = 75;
+        }
+        else if (last_level < 75 && bat_v >= V2_UP)
+        {
+            level = 75;
+        }
+        else if (last_level >= 50 && bat_v >= V3_DOWN)
+        {
+            level = 50;
+        }
+        else if (last_level < 50 && bat_v >= V3_UP)
+        {
+            level = 50;
+        }
+        else if (last_level >= 25 && bat_v >= V4_DOWN)
+        {
+            level = 25;
+        }
+        else if (last_level < 25 && bat_v >= V4_UP)
+        {
+            level = 25;
+        }
+        else
+        {
+            level = 0;
+        }
+        // testmpu();
+        last_level = level;
+        charging = gpio_get_level(PIN_NUM_VCC_DECT);
+        float crt = ina3221->getCurrent(BAT_PW);
+        if (crt > 0.01)
+            discharging = true;
+        else
+            discharging = false;
+
+        float voltage = 0.0f, current = 0.0f;
+        for (size_t i = 0; i < 3; i++)
+        {
+            voltage = ina3221->getBusVoltage(i);
+            current = ina3221->getCurrent(i);
+            ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        }
+        return true;
     }
-    return true;
-}
 #endif
 
     virtual bool CalibrateTime(struct tm *tm_info) override

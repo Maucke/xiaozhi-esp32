@@ -7,7 +7,7 @@
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
 #define SUB_DISPLAY_EN 1
-#define FORD_VFD_EN 0
+#define FORD_VFD_EN 1
 
 #define ESP_D103 0
 #define ESP_DUAL_DISPLAY 0
@@ -178,6 +178,7 @@
 #define PIN_NUM_VFD_PCLK (GPIO_NUM_11)
 #define PIN_NUM_VFD_CS (GPIO_NUM_12)
 #define PIN_NUM_VFD_EN (GPIO_NUM_NC)
+#define PIN_NUM_VFD_RE (GPIO_NUM_NC)
 
 #define PIN_NUM_SD_CS (GPIO_NUM_39)
 #define PIN_NUM_SD_MOSI (GPIO_NUM_40)

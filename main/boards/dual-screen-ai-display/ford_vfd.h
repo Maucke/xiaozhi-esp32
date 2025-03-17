@@ -91,6 +91,7 @@ public:
 
     void charhelper(int index, char ch);
     void charhelper(int index, uint8_t code);
+    void setsleep(bool en);
     void refrash(uint8_t *gram, int size);
 
     void time_blink();
