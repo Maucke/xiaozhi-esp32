@@ -38,7 +38,7 @@ PCF8574::PCF8574(i2c_bus_handle_t bus, uint8_t dev_addr)
 	sens->dev_addr = dev_addr;
 	pcf8574_handle_ = sens;
 	auto ret = readGpio();
-	ESP_LOGE(TAG, "pcf8574 init: %d", ret);
+	ESP_LOGI(TAG, "pcf8574 init: %d", ret);
 }
 
 esp_err_t PCF8574::write(uint8_t pin, uint8_t value)

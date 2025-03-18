@@ -29,9 +29,9 @@
 #include "rx8900.h"
 #include "esp_sntp.h"
 #include "settings.h"
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
 #include "ford_vfd.h"
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
 #include "hna_16mm65t.h"
 #endif
 #include "spectrumdisplay.h"
@@ -64,10 +64,14 @@ static const sh8601_lcd_init_cmd_t vendor_specific_init[] = {
     {0x51, (uint8_t[]){0xFF}, 1, 0},
 };
 
-class CustomLcdDisplay : public QspiLcdDisplay, public Led,
-#if FORD_VFD_EN
+class CustomLcdDisplay : public QspiLcdDisplay
+#if SUB_DISPLAY_EN && FORD_VFD_EN
+    ,
+                         public Led,
                          public FORD_VFD
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
+    ,
+                         public Led,
                          public HNA_16MM65T
 #endif
 {
@@ -78,7 +82,7 @@ private:
     std::vector<lv_obj_t *> labelContainer; // 存储 label 指针的容器
     lv_anim_t anim[3];
 
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
     lv_display_t *subdisplay;
     lv_obj_t *sub_status_label_;
 #endif
@@ -115,10 +119,12 @@ public:
                              .icon_font = &font_awesome_16_4,
                              .emoji_font = font_emoji_32_init(),
                          },
-                         tp_handle),
-#if FORD_VFD_EN
+                         tp_handle)
+#if SUB_DISPLAY_EN && FORD_VFD_EN
+          ,
           FORD_VFD(spidevice)
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
+          ,
           HNA_16MM65T(spidevice)
 #endif
     {
@@ -130,7 +136,7 @@ public:
         // lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.1, 0);
         // lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES * 0.1, 0);
 
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
         InitializeSubScreen();
         SetupSubUI();
 #endif
@@ -166,7 +172,9 @@ public:
             SetBacklightWithoutSave(GetBacklight());
         }
 
+#if SUB_DISPLAY_EN
         SetSubSleep(en);
+#endif
     }
 
     static void set_width(void *var, int32_t v)
@@ -190,16 +198,7 @@ public:
         }
         Settings settings("display", true);
         settings.SetInt("bright", brightness_);
-
-        ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-        // LEDC resolution set to 10bits, thus: 100% = 255
-        uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
-        int lcd_cmd = 0x51;
-        lcd_cmd &= 0xff;
-        lcd_cmd <<= 8;
-        lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
-        esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-        SetSubBacklight(brightness);
+        SetBacklightWithoutSave(brightness_);
     }
 
     void SetBacklightWithoutSave(uint8_t brightness)
@@ -218,7 +217,9 @@ public:
         lcd_cmd <<= 8;
         lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
         esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
+#if SUB_DISPLAY_EN
         SetSubBacklight(brightness);
+#endif
     }
     static void btn_pressed_cb(lv_event_t *e)
     {
@@ -354,7 +355,7 @@ public:
     {
         if (content != nullptr && *content == '\0')
             return;
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
         SetSubContent(content);
 #endif
         // std::stringstream ss;
@@ -436,7 +437,7 @@ public:
         lv_obj_update_layout(content_);
     }
 
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
 
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000) override
     {
@@ -646,7 +647,7 @@ public:
     {
         setsleep(en);
     }
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
     void SetSubSleep(bool en = true)
     {
         pt6324_setsleep(en);
@@ -721,7 +722,7 @@ public:
 class DualScreenAIDisplay : public WifiBoard
 {
 private:
-    Button touch_button_;
+    Button *touch_button_ = NULL;
     CustomLcdDisplay *display_ = NULL;
     adc_oneshot_unit_handle_t adc_handle;
     adc_cali_handle_t bat_adc_cali_handle, dimm_adc_cali_handle;
@@ -775,18 +776,18 @@ private:
         {
             if (battery_level == 0)
             {
-                ESP_LOGI(TAG, "Battery too low, Deep sleep");
+                ESP_LOGI(TAG, "Battery too low, Deep sleep, MPU sleep");
                 app.Alert(Lang::Strings::WARNING, Lang::Strings::BATTERY_LOW, "sad", Lang::Sounds::P3_VIBRATION);
                 show_low_power_warning_ = true;
-
-                EnableDeepSleep();
+                mpu6050_sleep(mpu6050);
+                Sleep();
             }
 
             power_save_ticks_++;
             if (power_save_ticks_ >= SECONDS_TO_SLEEP)
             {
                 ESP_LOGI(TAG, "Timeout, Deep sleep");
-                EnableDeepSleep();
+                Sleep();
             }
         }
         else
@@ -810,12 +811,11 @@ private:
 #endif
     }
 
-    void EnableDeepSleep()
+    void Sleep() override
     {
         display_->SetChatMessage("system", "sleepy");
         display_->SetEmotion("sleepy");
-#if FORD_VFD_EN
-#else
+#if SUB_DISPLAY_EN && HNA_16MM65T_EN
         display_->Notification("  sleepy  ", 4000);
 #endif
         vTaskDelay(pdMS_TO_TICKS(4000));
@@ -827,6 +827,7 @@ private:
         pcf8574->writeGpio(TPS_PS, 0);
 #endif
         bool active;
+        mpu6050_enable_motiondetection(mpu6050, 1, 20);
         mpu6050_getMotionInterruptStatus(mpu6050, &active);
         // mpu6050_sleep(mpu6050);
         display_->SetSleep(true);
@@ -876,21 +877,7 @@ private:
         if (i2c_bus == nullptr)
             return;
         uint8_t device_addresses[256];
-        uint8_t device_count;
-        device_count = i2c_bus_scan(i2c_bus, device_addresses, 255);
-
-        if (device_count > 0)
-        {
-            ESP_LOGI(TAG, "Found %d I2C devices:\n", device_count);
-            for (int i = 0; i < device_count; i++)
-            {
-                ESP_LOGI(TAG, "Device %d: Address 0x%02X\n", i + 1, device_addresses[i]);
-            }
-        }
-        else
-        {
-            ESP_LOGW(TAG, "No I2C devices found.\n");
-        }
+        i2c_bus_scan(i2c_bus, device_addresses, 255);
 
         bmp280 = bmp280_create(i2c_bus, BMP280_I2C_ADDRESS_DEFAULT);
         esp_err_t ret = bmp280_default_init(bmp280);
@@ -922,7 +909,6 @@ private:
 
         mpu6050 = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
         ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050));
-        mpu6050_enable_motiondetection(mpu6050, 1, 20);
 
 #if ESP_DUAL_DISPLAY_V2
         pcf8574 = new PCF8574(i2c_bus);
@@ -936,42 +922,11 @@ private:
             ESP_LOGI(TAG, "channel: %d, voltage: %.2fv, current: %.2fa", i, voltage, current);
         }
 #endif
-
-        xTaskCreate([](void *arg)
-                    { sntp_set_time_sync_notification_cb([](struct timeval *t) {
-                if (settimeofday(t, NULL) == ESP_FAIL) {
-                    ESP_LOGE(TAG, "Failed to set system time");
-                    return;
-                }
-                struct tm tm_info;
-                localtime_r(&t->tv_sec, &tm_info);
-                char time_str[50];
-                strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
-
-                ESP_LOGD(TAG, "The net time is: %s", time_str);
-                auto ret = Board::GetInstance().CalibrateTime(&tm_info);
-                if(!ret)
-                    ESP_LOGI(TAG, "Calibration Time Failed");
-                    else
-                    {
-                        CustomLcdDisplay *display = (CustomLcdDisplay*)Board::GetInstance().GetDisplay();
-                        if(display != nullptr)
-                            display->Notification("SYNC TM OK", 1000);
-                        } 
-                    });
-        esp_netif_init();
-        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-        esp_sntp_setservername(0, (char *)NTP_SERVER1);
-        esp_sntp_setservername(1, (char *)NTP_SERVER2);
-        esp_sntp_init();
-        setenv("TZ", DEFAULT_TIMEZONE, 1);
-        tzset();
-        // configTzTime(DEFAULT_TIMEZONE, NTP_SERVER1, NTP_SERVER2);
-        vTaskDelete(NULL); }, "timesync", 4096, NULL, 4, nullptr);
     }
 
     void InitializeButtons()
     {
+        touch_button_ = new Button(TOUCH_BUTTON_GPIO);
         // boot_button_.OnClick([this]()
         //                      {
         //     auto& app = Application::GetInstance();
@@ -979,11 +934,10 @@ private:
         //         ResetWifiConfiguration();
         //     }
         //     app.ToggleChatState(); });
-
-        touch_button_.OnLongPress([this]
-                                  {
+        touch_button_->OnLongPress([this]
+                                   {
                                     ESP_LOGI(TAG, "Button long pressed, Deep sleep");
-                                     EnableDeepSleep(); });
+                                     Sleep(); });
 
         // touch_button_.OnPressDown([this]()
         //                           { Application::GetInstance().StartListening(); });
@@ -1001,7 +955,13 @@ private:
         spi_bus_config_t buscfg = {0};
         spi_device_handle_t spi_device = nullptr;
 
-#if SUB_DISPLAY_EN
+        // Log the initialization process
+        ESP_LOGI(TAG, "Initialize VFD SPI bus");
+
+        // Set the clock and data pins for the SPI bus
+        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
+        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
+#if SUB_DISPLAY_EN && FORD_VFD_EN
         if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
         {
             gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
@@ -1013,8 +973,6 @@ private:
         // Set the clock and data pins for the SPI bus
         buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
         buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
-#if FORD_VFD_EN
-
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 1024;
 
@@ -1026,8 +984,24 @@ private:
             .flags = 0,
             .queue_size = 7,
         };
-#else
 
+        // Initialize the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_initialize(VFD_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+        // Add the PT6324 device to the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
+        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
+        {
+            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
+            gpio_set_level(PIN_NUM_VFD_RE, 1);
+        }
+        // Log the initialization process
+        ESP_LOGI(TAG, "Initialize VFD SPI bus");
+
+        // Set the clock and data pins for the SPI bus
+        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
+        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
 
@@ -1039,18 +1013,17 @@ private:
             .flags = SPI_DEVICE_BIT_LSBFIRST,
             .queue_size = 7,
         };
-#endif
-#if ESP_DUAL_DISPLAY_V2
-        pcf8574->writeGpio(OLED_RST, 0);
-        vTaskDelay(pdMS_TO_TICKS(120));
-        pcf8574->writeGpio(OLED_RST, 1);
-#endif
 
         // Initialize the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_initialize(VFD_HOST, &buscfg, SPI_DMA_CH_AUTO));
 
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
+#endif
+#if ESP_DUAL_DISPLAY_V2
+        pcf8574->writeGpio(OLED_RST, 0);
+        vTaskDelay(pdMS_TO_TICKS(120));
+        pcf8574->writeGpio(OLED_RST, 1);
 #endif
         ESP_LOGI(TAG, "Initialize OLED SPI bus");
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
@@ -1146,10 +1119,8 @@ private:
         (esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, &tp)); // The first initial will be failed
         (esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, &tp));
 #endif
-
         display_ = new CustomLcdDisplay(panel_io, panel, tp,
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, spi_device);
-
         if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
         {
             ESP_LOGI(TAG, "Enable amoled power");
@@ -1251,7 +1222,7 @@ private:
     }
 
 public:
-    DualScreenAIDisplay() : touch_button_(TOUCH_BUTTON_GPIO)
+    DualScreenAIDisplay()
     {
         if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
         {
@@ -1270,12 +1241,44 @@ public:
         pcf8574->writeGpio(SD_EN, 1);
 #endif
         vTaskDelay(pdMS_TO_TICKS(120));
+
+        xTaskCreate([](void *arg)
+                    { sntp_set_time_sync_notification_cb([](struct timeval *t) {
+                if (settimeofday(t, NULL) == ESP_FAIL) {
+                    ESP_LOGE(TAG, "Failed to set system time");
+                    return;
+                }
+                struct tm tm_info;
+                localtime_r(&t->tv_sec, &tm_info);
+                char time_str[50];
+                strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
+
+                ESP_LOGD(TAG, "The net time is: %s", time_str);
+                auto ret = Board::GetInstance().CalibrateTime(&tm_info);
+                if(!ret)
+                    ESP_LOGI(TAG, "Calibration Time Failed");
+                    else
+                    {
+                        CustomLcdDisplay *display = (CustomLcdDisplay*)Board::GetInstance().GetDisplay();
+                        if(display != nullptr)
+                            display->Notification("SYNC TM OK", 1000);
+                        } 
+                    });
+        esp_netif_init();
+        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, (char *)NTP_SERVER1);
+        esp_sntp_setservername(1, (char *)NTP_SERVER2);
+        esp_sntp_init();
+        setenv("TZ", DEFAULT_TIMEZONE, 1);
+        tzset();
+        vTaskDelete(NULL); }, "timesync", 4096, NULL, 4, nullptr);
+
         InitializeDisplay();
-        InitializeButtons();
         InitializePowerSaveTimer();
         InitializeIot();
         GetWakeupCause();
-
+        GetSdcard();
+        InitializeButtons();
 #if ESP_DUAL_DISPLAY_V2
         gpio_set_direction(PIN_NUM_VCC_DECT, GPIO_MODE_INPUT);
         gpio_set_pull_mode(PIN_NUM_VCC_DECT, GPIO_FLOATING);
@@ -1285,13 +1288,12 @@ public:
 
     virtual Led *GetLed() override
     {
-        // if (display_ != nullptr)
+#if SUB_DISPLAY_EN
         return display_;
-        // else
-        // {
-        //     static SingleLed led(BUILTIN_LED_GPIO);
-        //     return &led;
-        // }
+#else
+        static SingleLed led(BUILTIN_LED_GPIO);
+        return &led;
+#endif
     }
 
     virtual float GetBarometer() override
@@ -1430,7 +1432,67 @@ public:
 #define V4_UP 3100
 #define V4_DOWN 2900
 
-#if ESP_DUAL_DISPLAY
+#if ESP_DUAL_DISPLAY_V2
+    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
+    {
+        static int last_level = 0;
+        int bat_v = ina3221->getBusVoltage(BAT_PW);
+        int new_level;
+        if (last_level >= 100 && bat_v >= V1_DOWN)
+        {
+            new_level = 100;
+        }
+        else if (last_level < 100 && bat_v >= V1_UP)
+        {
+            new_level = 100;
+        }
+        else if (last_level >= 75 && bat_v >= V2_DOWN)
+        {
+            new_level = 75;
+        }
+        else if (last_level < 75 && bat_v >= V2_UP)
+        {
+            new_level = 75;
+        }
+        else if (last_level >= 50 && bat_v >= V3_DOWN)
+        {
+            new_level = 50;
+        }
+        else if (last_level < 50 && bat_v >= V3_UP)
+        {
+            new_level = 50;
+        }
+        else if (last_level >= 25 && bat_v >= V4_DOWN)
+        {
+            new_level = 25;
+        }
+        else if (last_level < 25 && bat_v >= V4_UP)
+        {
+            new_level = 25;
+        }
+        else
+        {
+            new_level = 0;
+        }
+        // testmpu();
+        level = new_level;
+        charging = gpio_get_level(PIN_NUM_VCC_DECT);
+        float crt = ina3221->getCurrent(BAT_PW);
+        if (crt > 0.01)
+            discharging = true;
+        else
+            discharging = false;
+
+        // float voltage = 0.0f, current = 0.0f;
+        // for (size_t i = 0; i < 3; i++)
+        // {
+        //     voltage = ina3221->getBusVoltage(i);
+        //     current = ina3221->getCurrent(i);
+        //     ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        // }
+        return true;
+    }
+#else
     virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
     {
         static int last_level = 0;
@@ -1502,66 +1564,6 @@ public:
         discharging = !charging;
         return true;
     }
-#elif ESP_DUAL_DISPLAY_V2
-    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
-    {
-        static int last_level = 0;
-        int bat_v = ina3221->getBusVoltage(BAT_PW) * 1000;
-
-        if (last_level >= 100 && bat_v >= V1_DOWN)
-        {
-            level = 100;
-        }
-        else if (last_level < 100 && bat_v >= V1_UP)
-        {
-            level = 100;
-        }
-        else if (last_level >= 75 && bat_v >= V2_DOWN)
-        {
-            level = 75;
-        }
-        else if (last_level < 75 && bat_v >= V2_UP)
-        {
-            level = 75;
-        }
-        else if (last_level >= 50 && bat_v >= V3_DOWN)
-        {
-            level = 50;
-        }
-        else if (last_level < 50 && bat_v >= V3_UP)
-        {
-            level = 50;
-        }
-        else if (last_level >= 25 && bat_v >= V4_DOWN)
-        {
-            level = 25;
-        }
-        else if (last_level < 25 && bat_v >= V4_UP)
-        {
-            level = 25;
-        }
-        else
-        {
-            level = 0;
-        }
-        // testmpu();
-        last_level = level;
-        charging = gpio_get_level(PIN_NUM_VCC_DECT);
-        float crt = ina3221->getCurrent(BAT_PW);
-        if (crt > 0.01)
-            discharging = true;
-        else
-            discharging = false;
-
-        float voltage = 0.0f, current = 0.0f;
-        for (size_t i = 0; i < 3; i++)
-        {
-            voltage = ina3221->getBusVoltage(i);
-            current = ina3221->getCurrent(i);
-            ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
-        }
-        return true;
-    }
 #endif
 
     virtual bool CalibrateTime(struct tm *tm_info) override
@@ -1589,18 +1591,22 @@ public:
 
     virtual bool TimeUpdate() override
     {
+#if SUB_DISPLAY_EN && FORD_VFD_EN
         static struct tm time_user;
         time_t now = time(NULL);
         time_user = *localtime(&now);
         char time_str[7];
-#if FORD_VFD_EN
         strftime(time_str, sizeof(time_str), "%H%M", &time_user);
         display_->number_show(5, time_str, 4);
         display_->time_blink();
         strftime(time_str, sizeof(time_str), "%m%d", &time_user);
         display_->symbolhelper(POINT1, true);
         display_->number_show(1, time_str, 4, FORD_DOWN2UP);
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
+        static struct tm time_user;
+        time_t now = time(NULL);
+        time_user = *localtime(&now);
+        char time_str[7];
         strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
         display_->content_show(4, time_str, 6);
         display_->time_blink();

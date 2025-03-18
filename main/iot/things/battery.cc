@@ -8,17 +8,20 @@
 namespace iot
 {
 
-// 这里仅定义 Battery 的属性和方法，不包含具体的实现
-class Battery : public Thing {
-private:
-    int level_ = 0;
-    bool charging_ = false;
-    bool discharging_ = false;
+    // 这里仅定义 Battery 的属性和方法，不包含具体的实现
+    class Battery : public Thing
+    {
+    private:
+        int level_ = 0;
+        bool charging_ = false;
+        bool discharging_ = false;
 
-public:
-    Battery() : Thing("Battery", "电池管理") {
-        // 定义设备的属性
-        properties_.AddNumberProperty("level", "当前电量百分比", [this]() -> int {
+    public:
+        Battery() : Thing("Battery", "电池管理")
+        {
+            // 定义设备的属性
+            properties_.AddNumberProperty("level", "当前电量百分比", [this]() -> int
+                                          {
             auto& board = Board::GetInstance();
             if (board.GetBatteryLevel(level_, charging_, discharging_)) {
                 return level_;
@@ -26,6 +29,11 @@ public:
             return 0; });
             properties_.AddBooleanProperty("charging", "是否充电中", [this]() -> int
                                            { return charging_; });
+
+            methods_.AddMethod("sleep", "睡眠", ParameterList(), [this](const ParameterList &parameters)
+                               {
+                auto& board = Board::GetInstance();
+                board.Sleep(); });
         }
     };
 

@@ -44,13 +44,14 @@ public:
     virtual float GetTemperature() { return 0; }
     virtual Display *GetDisplay();
     virtual Sdcard *GetSdcard();
+    virtual void Sleep() {};
     virtual Http *CreateHttp() = 0;
     virtual WebSocket *CreateWebSocket() = 0;
     virtual Mqtt *CreateMqtt() = 0;
     virtual Udp *CreateUdp() = 0;
     virtual void StartNetwork() = 0;
     virtual const char *GetNetworkStateIcon() = 0;
-    virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);
+    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging);
     virtual bool TimeUpdate();
     virtual bool DimmingUpdate();
     virtual bool CalibrateTime(struct tm *tm_info);

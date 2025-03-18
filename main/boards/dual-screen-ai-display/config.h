@@ -6,9 +6,12 @@
 #define AUDIO_INPUT_SAMPLE_RATE 24000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
+// 副屏选择，如果有副屏，则需打开SUB_DISPLAY_EN和对应屏幕
 #define SUB_DISPLAY_EN 1
-#define FORD_VFD_EN 1
+#define FORD_VFD_EN 0
+#define HNA_16MM65T_EN 1
 
+// 板子选择
 #define ESP_D103 0
 #define ESP_DUAL_DISPLAY 0
 #define ESP_DUAL_DISPLAY_V2 1
@@ -238,7 +241,7 @@
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 
-// #define BUILTIN_LED_GPIO GPIO_NUM_1 // 以适配
+#define BUILTIN_LED_GPIO GPIO_NUM_1 
 // #define BOOT_BUTTON_GPIO GPIO_NUM_0 // 以适配
 // #define RESET_NVS_BUTTON_GPIO     GPIO_NUM_1
 // #define RESET_FACTORY_BUTTON_GPIO GPIO_NUM_4
@@ -270,7 +273,7 @@ enum ExternalIO
     VFD_EN,
 };
 
-char *DectectCHEnum[] = {"VFD", "VCC", "BAT"};
+const char *DectectCHEnum[] = {"VFD", "VCC", "BAT"};
 enum DectectCH
 {
     VFD_PW = 0,
@@ -305,9 +308,10 @@ enum DectectCH
 #define PIN_NUM_SD_D1 (GPIO_NUM_2)
 #define PIN_NUM_SD_D2 (GPIO_NUM_38)
 #define PIN_NUM_SD_D3 (GPIO_NUM_39)
+// #define PIN_NUM_SD_CDZ (GPIO_NUM_43)
 #define PIN_NUM_SD_CDZ (GPIO_NUM_NC)
 #define PIN_NUM_SD_EN (GPIO_NUM_NC) // follow the pcf8574
-#else
+#elif ESP_DUAL_DISPLAY
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
 
 #define AUDIO_I2S_MIC_GPIO_WS GPIO_NUM_4
@@ -389,4 +393,5 @@ enum DectectCH
 #define PIN_NUM_VFD_PCLK (GPIO_NUM_45)
 #define PIN_NUM_VFD_CS (GPIO_NUM_46)
 #endif
+
 #endif // _BOARD_CONFIG_H_
