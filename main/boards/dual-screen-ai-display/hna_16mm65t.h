@@ -1,6 +1,6 @@
 /**
  * @file HNA_16MM65T.h
- * @brief This header file defines the HNA_16MM65T class, which is used to control the display of a specific device and inherits from the PT6324Writer class.
+ * @brief This header file defines the HNA_16MM65T class, which is used to control the display of a specific device and inherits from the PT6324 class.
  *
  * This class provides a series of methods for displaying spectrum, numbers, symbols, dot matrix and other information, and also supports animation effects.
  *
@@ -140,11 +140,11 @@ typedef struct
 
 /**
  * @class HNA_16MM65T
- * @brief This class inherits from the PT6324Writer class and is used to control the display of a specific device.
+ * @brief This class inherits from the PT6324 class and is used to control the display of a specific device.
  *
  * It provides methods for displaying spectrum, numbers, symbols, dot matrix and other information, and also supports animation effects.
  */
-class HNA_16MM65T : protected PT6324Writer
+class HNA_16MM65T : protected PT6324
 {
     // Define the buffer size
 #define BUF_SIZE (1024)
@@ -306,9 +306,9 @@ private:
 
 public:
     /**
-     * @brief Constructor for the PT6324Writer class.
+     * @brief Constructor for the PT6324 class.
      *
-     * Initializes the PT6324Writer object with the specified GPIO pins and SPI host device.
+     * Initializes the PT6324 object with the specified GPIO pins and SPI host device.
      *
      * @param din The GPIO pin number for the data input line.
      * @param clk The GPIO pin number for the clock line.

@@ -274,18 +274,18 @@ void HNA_16MM65T::contentanimate()
 }
 
 /**
- * @brief Constructor for the PT6324Writer class.
+ * @brief Constructor for the PT6324 class.
  *
- * Initializes the PT6324Writer object with the specified GPIO pins and SPI host device.
+ * Initializes the PT6324 object with the specified GPIO pins and SPI host device.
  *
  * @param din The GPIO pin number for the data input line.
  * @param clk The GPIO pin number for the clock line.
  * @param cs The GPIO pin number for the chip select line.
  * @param spi_num The SPI host device number to use for communication.
  */
-HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6324Writer(din, clk, cs, spi_num)
+HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6324(din, clk, cs, spi_num)
 {
-    pt6324_init();
+    init();
     xTaskCreate(
         [](void *arg)
         {
@@ -293,7 +293,7 @@ HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host
             vfd->symbolhelper(LBAR_RBAR, true);
             while (true)
             {
-                vfd->pt6324_refrash(vfd->gram);
+                vfd->refrash(vfd->gram);
                 vfd->contentanimate();
                 vfd->waveanimate();
                 vTaskDelay(pdMS_TO_TICKS(10));
@@ -314,14 +314,14 @@ HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host
  *
  * @param spi_device The SPI device handle used to communicate with the PT6324.
  */
-HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324Writer(spi_device)
+HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324(spi_device)
 {
     if (!spi_device)
     {
         ESP_LOGE(TAG, "VFD spi is null");
         return;
     }
-    pt6324_init();
+    init();
     xTaskCreate(
         [](void *arg)
         {
@@ -329,7 +329,7 @@ HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324Writer(spi_devi
             vfd->symbolhelper(LBAR_RBAR, true);
             while (true)
             {
-                vfd->pt6324_refrash(vfd->gram);
+                vfd->refrash(vfd->gram);
                 vfd->contentanimate();
                 vfd->waveanimate();
                 vTaskDelay(pdMS_TO_TICKS(10));

@@ -650,12 +650,12 @@ public:
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
     void SetSubSleep(bool en = true)
     {
-        pt6324_setsleep(en);
+        setsleep(en);
     }
 
     void SetSubBacklight(uint8_t brightness)
     {
-        pt6324_setbrightness(brightness);
+        setbrightness(brightness);
     }
 
     virtual void OnStateChanged() override
