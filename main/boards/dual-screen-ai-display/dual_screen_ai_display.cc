@@ -604,7 +604,7 @@ public:
             symbolhelper(BT, true);
             break;
         case kDeviceStateIdle:
-            setmode(FORD_FFT);
+            setmode(FORD_VFD::FFT);
             return;
         case kDeviceStateConnecting:
             symbolhelper(TA, true);
@@ -630,11 +630,11 @@ public:
             symbolhelper(UDISK, true);
             break;
         default:
-            setmode(FORD_CONTENT);
+            setmode(FORD_VFD::CONTENT);
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
             return;
         }
-        setmode(FORD_CONTENT);
+        setmode(FORD_VFD::CONTENT);
     }
 
 #if CONFIG_USE_FFT_EFFECT
@@ -707,7 +707,7 @@ public:
 
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show(0, (char *)content.c_str(), 10, HNA_UP2DOWN, timeout);
+        noti_show(0, (char *)content.c_str(), 10, HNA_16MM65T::UP2DOWN, timeout);
     }
 
 #if CONFIG_USE_FFT_EFFECT
@@ -800,14 +800,14 @@ private:
         }
 #if FORD_VFD_EN
         if (!charging)
-            display_->symbolhelper(AUX, false);
+            display_->symbolhelper(FORD_VFD::AUX, false);
         else
-            display_->symbolhelper(AUX, true);
+            display_->symbolhelper(FORD_VFD::AUX, true);
 #else
         if (!charging)
-            display_->symbolhelper(USB2, false);
+            display_->symbolhelper(HNA_16MM65T::USB2, false);
         else
-            display_->symbolhelper(USB2, true);
+            display_->symbolhelper(HNA_16MM65T::USB2, true);
 #endif
     }
 
@@ -1600,8 +1600,8 @@ public:
         display_->number_show(5, time_str, 4);
         display_->time_blink();
         strftime(time_str, sizeof(time_str), "%m%d", &time_user);
-        display_->symbolhelper(POINT1, true);
-        display_->number_show(1, time_str, 4, FORD_DOWN2UP);
+        display_->symbolhelper(FORD_VFD::POINT1, true);
+        display_->number_show(1, time_str, 4, FORD_VFD::DOWN2UP);
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
         static struct tm time_user;
         time_t now = time(NULL);
@@ -1612,7 +1612,7 @@ public:
         display_->time_blink();
         const char *weekDays[7] = {
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-        display_->content_show(0, (char *)weekDays[time_user.tm_wday % 7], 3, HNA_DOWN2UP);
+        display_->content_show(0, (char *)weekDays[time_user.tm_wday % 7], 3, HNA_16MM65T::DOWN2UP);
 #endif
         return true;
     }

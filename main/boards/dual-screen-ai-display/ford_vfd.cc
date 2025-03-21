@@ -92,7 +92,7 @@ void FORD_VFD::time_blink()
 	symbolhelper(COLON2, time_mark);
 }
 
-void FORD_VFD::number_show(int start, char *buf, int size, FORD_NumAni ani)
+void FORD_VFD::number_show(int start, char *buf, int size, NumAni ani)
 {
 	for (size_t i = 0; i < size && (start + i) < NUM_SIZE; i++)
 	{
@@ -124,7 +124,7 @@ void FORD_VFD::contentanimate()
 			uint8_t before_raw_code = find_hex_code(currentData[i].last_content);
 			uint8_t raw_code = find_hex_code(currentData[i].current_content);
 			uint8_t code = raw_code;
-			if (currentData[i].animation_type == FORD_CLOCKWISE)
+			if (currentData[i].animation_type == CLOCKWISE)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -151,7 +151,7 @@ void FORD_VFD::contentanimate()
 					break;
 				}
 			}
-			else if (currentData[i].animation_type == FORD_ANTICLOCKWISE)
+			else if (currentData[i].animation_type == ANTICLOCKWISE)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -178,7 +178,7 @@ void FORD_VFD::contentanimate()
 					break;
 				}
 			}
-			else if (currentData[i].animation_type == FORD_UP2DOWN)
+			else if (currentData[i].animation_type == UP2DOWN)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -196,7 +196,7 @@ void FORD_VFD::contentanimate()
 					break;
 				}
 			}
-			else if (currentData[i].animation_type == FORD_DOWN2UP)
+			else if (currentData[i].animation_type == DOWN2UP)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -214,7 +214,7 @@ void FORD_VFD::contentanimate()
 					break;
 				}
 			}
-			else if (currentData[i].animation_type == FORD_LEFT2RT)
+			else if (currentData[i].animation_type == LEFT2RT)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -232,7 +232,7 @@ void FORD_VFD::contentanimate()
 					break;
 				}
 			}
-			else if (currentData[i].animation_type == FORD_RT2LEFT)
+			else if (currentData[i].animation_type == RT2LEFT)
 			{
 				switch (currentData[i].animation_step)
 				{
@@ -275,7 +275,7 @@ void FORD_VFD::init()
 	write_data8((uint8_t *)init_data_block8, sizeof(init_data_block8));
 	_spectrum = new SpectrumDisplay(FORD_WIDTH, FORD_HEIGHT);
 	_spectrum->setDrawPointCallback([this](int x, int y, uint8_t dot)
-									{ this->draw_point(x, y, dot, FORD_FFT); });
+									{ this->draw_point(x, y, dot, FFT); });
 	xTaskCreate(
 		[](void *arg)
 		{
@@ -283,7 +283,7 @@ void FORD_VFD::init()
 			vfd->symbolhelper(BT, true);
 			while (true)
 			{
-				if (vfd->_mode == FORD_FFT)
+				if (vfd->_mode == FFT)
 					vfd->clear();
 				vfd->_spectrum->spectrumProcess();
 				vfd->refrash(vfd->gram, sizeof vfd->gram);
@@ -316,7 +316,7 @@ uint8_t FORD_VFD::get_group(int x, uint8_t dot, uint8_t group, bool isOdd)
 	return group & 0x7;
 }
 
-void FORD_VFD::draw_point(int x, int y, uint8_t dot, FORD_Mode mode)
+void FORD_VFD::draw_point(int x, int y, uint8_t dot, Mode mode)
 {
 	if (mode != _mode)
 		return;
@@ -414,15 +414,15 @@ void FORD_VFD::clear()
 	memset(&gram[515], 0, 814 - 515);
 #endif
 }
-void FORD_VFD::find_enum_code(FORD_Symbols flag, int *byteIndex, int *bitIndex)
+void FORD_VFD::find_enum_code(Symbols flag, int *byteIndex, int *bitIndex)
 {
 	*byteIndex = symbolPositions[flag].byteIndex;
 	*bitIndex = symbolPositions[flag].bitIndex;
 }
 
-void FORD_VFD::symbolhelper(FORD_Symbols symbol, bool is_on)
+void FORD_VFD::symbolhelper(Symbols symbol, bool is_on)
 {
-	if (symbol >= FORD_SYMBOL_MAX)
+	if (symbol >= SYMBOL_MAX)
 		return;
 
 	int byteIndex, bitIndex;
@@ -547,8 +547,7 @@ void FORD_VFD::charhelper(int index, uint8_t code)
 
 void FORD_VFD::setsleep(bool en)
 {
-    bool dimmen = !en;
-    if (!dimmen)
+    if (en)
     {
         memset(gram, 0, sizeof gram);
         // pt6324_refrash(gram);

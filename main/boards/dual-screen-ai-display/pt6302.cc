@@ -44,7 +44,7 @@ PT6302::PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t 
     spi_bus_config_t buscfg = {0};
 
     // Log the initialization process
-    ESP_LOGI(TAG, "Initialize VFD SPI bus");
+    ESP_LOGI(TAG, "Initialize PT6302 SPI bus");
 
     // Set the clock and data pins for the SPI bus
     buscfg.sclk_io_num = clk;
@@ -136,10 +136,24 @@ void PT6302::refrash(Gram *gram)
     setdimming();
 }
 
+void PT6302::refrash(uint8_t *gram)
+{
+    refrash((Gram *)gram);
+}
+
+void PT6302::setsleep(bool en)
+{
+    if (en)
+    {
+        memset(internal_gram, 0, sizeof internal_gram);
+    }
+}
+
 void PT6302::setbrightness(uint8_t brightness)
 {
     dimming = brightness * 8 / 100;
     if (dimming > 7)
         dimming = 7;
+    // ESP_LOGI(TAG, "dimming %d", dimming);
     return;
 }

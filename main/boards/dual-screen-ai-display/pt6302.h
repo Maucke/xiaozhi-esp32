@@ -1,11 +1,7 @@
-/**
- * @file PT6302.h
- * Header file for PT6302 library.
- *
- * Arduino library for communicating with the Princeton Technology PT6302 VFD Driver/Controller IC with Character RAM
- * This library only includes the ASCII compatible characters, all others will have to be printed using the hex codes in the datasheet.
- *
- * Copyright (c) 2021 Arne van Iterson
+/*
+ * Author: 施华锋
+ * Date: 2025-03-21
+ * Description: This header file defines the PT6324 class for communicating with the PT6324 device via SPI.
  */
 
 #ifndef PT6302_H
@@ -16,7 +12,10 @@
 #include <esp_log.h>
 
 /**
- * @class PT6302 class
+ * @class PT6302
+ * @brief A class for interacting with the PT6302 device using SPI communication.
+ *
+ * This class provides methods to initialize the PT6302 device, write data to it, and refresh its display.
  */
 class PT6302
 {
@@ -43,6 +42,7 @@ public:
     PT6302(spi_device_handle_t spi_device) : spi_device_(spi_device) {}
     void init();
     void setbrightness(uint8_t brightness);
+    void setsleep(bool en);
 
 private:
     uint8_t dimming = 0;
@@ -58,9 +58,9 @@ private:
     void setmode(PT6302::Mode mode);
 
 protected:
-    bool dimmen = false;
-    uint8_t gram[10 + 15 + 5 * 5] = {0}; // Display buffer 10 num + 15 ad + 5 cgram
+    uint8_t internal_gram[10 + 15 + 5 * 5] = {0}; // Display buffer 10 num + 15 ad + 5 cgram
     void refrash(Gram *gram);
+    void refrash(uint8_t *gram);
 };
 
 #endif

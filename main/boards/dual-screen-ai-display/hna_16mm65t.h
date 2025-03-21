@@ -20,123 +20,12 @@
 // Define the starting index of numbers
 #define NUM_BEGIN 3
 #define COREWAVE_BEGIN 39
-
-/**
- * @enum Dots
- * @brief Defines different states of the dot matrix.
- */
-typedef enum
-{
-    DOT_MATRIX_UP,    // Dot matrix up
-    DOT_MATRIX_NEXT,  // Dot matrix next
-    DOT_MATRIX_PAUSE, // Dot matrix pause
-    DOT_MATRIX_FILL   // Dot matrix fill
-} Dots;
-
-/**
- * @enum HNA_Symbols
- * @brief Defines the enumeration type of various symbols.
- */
-typedef enum
-{
-    R_OUTER_B,
-    R_OUTER_A,
-    R_CENTER,
-    L_OUTER_B,
-    L_OUTER_A,
-    L_CENTER,
-    STEREO,
-    MONO,
-    GIGA,
-    REC_1,
-    DOT_MATRIX_4_6,
-    DOT_MATRIX_5_2_5_3_6_3,
-    DOT_MATRIX_0_3_0_5_0_6_1_2_1_3_1_5_1_6,
-    DOT_MATRIX_3_1_3_2_3_3_3_5_3_6_4_0_4_1_4_2_4_3_4_5_4_6_5_1_5_2_5_3_5_5,
-    DOT_MATRIX_5_4,
-    DOT_MATRIX_0_0_0_1_0_2_0_3_0_5_1_0_1_1_1_3_1_5_5_0_5_1_6_0_6_1_6_2_6_5,
-    DOT_MATRIX_2_0_2_4_3_4_4_4,
-    DOT_MATRIX_4_0,
-    DOT_MATRIX_2_MINUS1_2_7,
-    USB2,
-    USB1,
-    REC_2,
-    LBAR_RBAR,
-    CENTER_OUTLAY_BLUEA,
-    CENTER_OUTLAY_BLUEB,
-    CENTER_OUTLAY_REDA,
-    CENTER_OUTLAY_REDB,
-    CENTER_INLAY_BLUER,
-    CENTER_INLAY_BLUET,
-    CENTER_INLAY_BLUEL,
-    CENTER_INLAY_BLUEB,
-    CENTER_INLAY_RED1,
-    CENTER_INLAY_RED2,
-    CENTER_INLAY_RED3,
-    CENTER_INLAY_RED4,
-    CENTER_INLAY_RED5,
-    CENTER_INLAY_RED6,
-    CENTER_INLAY_RED7,
-    CENTER_INLAY_RED8,
-    CENTER_INLAY_RED9,
-    CENTER_INLAY_RED10,
-    CENTER_INLAY_RED11,
-    CENTER_INLAY_RED12,
-    CENTER_INLAY_RED13,
-    CENTER_INLAY_RED14,
-    CENTER_INLAY_RED15,
-    CENTER_INLAY_RED16,
-    NUM6_MARK,
-    NUM8_MARK,
-    NUM8_POINT,
-    HNA_SYMBOL_MAX // Maximum value of the symbol enumeration
-} HNA_Symbols;
-
-typedef enum
-{
-    HNA_NONE = -1,
-    HNA_CLOCKWISE,
-    HNA_ANTICLOCKWISE,
-    HNA_UP2DOWN,
-    HNA_DOWN2UP,
-    HNA_LEFT2RT,
-    HNA_RT2LEFT,
-    HNA_MAX
-} HNA_NumAni;
-
-/**
- * @struct HNA_SymbolPosition
- * @brief Defines the position of a symbol in the display buffer, consisting of a byte index and a bit index.
- */
-typedef struct
-{
-    int byteIndex; // Byte index
-    int bitIndex;  // Bit index
-} HNA_SymbolPosition;
-
-/**
- * @struct WaveFFTData
- * @brief Stores the data related to FFT waveform animation, including previous, target, and current values, as well as animation steps.
- */
-typedef struct
-{
-    int last_value;     // Last FFT value
-    int target_value;   // Target FFT value
-    int current_value;  // Current FFT value
-    int animation_step; // Animation step
-} WaveFFTData;
-
-/**
- * @struct ContentData
- * @brief Stores the data related to content display and animation, including current and last content, animation steps, and animation type.
- */
-typedef struct
-{
-    char current_content;
-    char last_content;
-    int animation_step;
-    HNA_NumAni animation_type;
-} ContentData;
+// Define the buffer size
+#define BUF_SIZE (1024)
+// Define the number of FFTs
+#define FFT_SIZE (12)
+// Define the number of digits
+#define CONTENT_SIZE (10)
 
 /**
  * @class HNA_16MM65T
@@ -146,12 +35,124 @@ typedef struct
  */
 class HNA_16MM65T : protected PT6324
 {
-    // Define the buffer size
-#define BUF_SIZE (1024)
-    // Define the number of FFTs
-#define FFT_SIZE (12)
-    // Define the number of digits
-#define CONTENT_SIZE (10)
+    public:
+    /**
+     * @enum Dots
+     * @brief Defines different states of the dot matrix.
+     */
+    typedef enum
+    {
+        DOT_MATRIX_UP,    // Dot matrix up
+        DOT_MATRIX_NEXT,  // Dot matrix next
+        DOT_MATRIX_PAUSE, // Dot matrix pause
+        DOT_MATRIX_FILL   // Dot matrix fill
+    } Dots;
+
+    /**
+     * @enum Symbols
+     * @brief Defines the enumeration type of various symbols.
+     */
+    typedef enum
+    {
+        R_OUTER_B,
+        R_OUTER_A,
+        R_CENTER,
+        L_OUTER_B,
+        L_OUTER_A,
+        L_CENTER,
+        STEREO,
+        MONO,
+        GIGA,
+        REC_1,
+        DOT_MATRIX_4_6,
+        DOT_MATRIX_5_2_5_3_6_3,
+        DOT_MATRIX_0_3_0_5_0_6_1_2_1_3_1_5_1_6,
+        DOT_MATRIX_3_1_3_2_3_3_3_5_3_6_4_0_4_1_4_2_4_3_4_5_4_6_5_1_5_2_5_3_5_5,
+        DOT_MATRIX_5_4,
+        DOT_MATRIX_0_0_0_1_0_2_0_3_0_5_1_0_1_1_1_3_1_5_5_0_5_1_6_0_6_1_6_2_6_5,
+        DOT_MATRIX_2_0_2_4_3_4_4_4,
+        DOT_MATRIX_4_0,
+        DOT_MATRIX_2_MINUS1_2_7,
+        USB2,
+        USB1,
+        REC_2,
+        LBAR_RBAR,
+        CENTER_OUTLAY_BLUEA,
+        CENTER_OUTLAY_BLUEB,
+        CENTER_OUTLAY_REDA,
+        CENTER_OUTLAY_REDB,
+        CENTER_INLAY_BLUER,
+        CENTER_INLAY_BLUET,
+        CENTER_INLAY_BLUEL,
+        CENTER_INLAY_BLUEB,
+        CENTER_INLAY_RED1,
+        CENTER_INLAY_RED2,
+        CENTER_INLAY_RED3,
+        CENTER_INLAY_RED4,
+        CENTER_INLAY_RED5,
+        CENTER_INLAY_RED6,
+        CENTER_INLAY_RED7,
+        CENTER_INLAY_RED8,
+        CENTER_INLAY_RED9,
+        CENTER_INLAY_RED10,
+        CENTER_INLAY_RED11,
+        CENTER_INLAY_RED12,
+        CENTER_INLAY_RED13,
+        CENTER_INLAY_RED14,
+        CENTER_INLAY_RED15,
+        CENTER_INLAY_RED16,
+        NUM6_MARK,
+        NUM8_MARK,
+        NUM8_POINT,
+        SYMBOL_MAX // Maximum value of the symbol enumeration
+    } Symbols;
+
+    typedef enum
+    {
+        NONE = -1,
+        CLOCKWISE,
+        ANTICLOCKWISE,
+        UP2DOWN,
+        DOWN2UP,
+        LEFT2RT,
+        RT2LEFT,
+        MAX
+    } NumAni;
+
+    /**
+     * @struct SymbolPosition
+     * @brief Defines the position of a symbol in the display buffer, consisting of a byte index and a bit index.
+     */
+    typedef struct
+    {
+        int byteIndex; // Byte index
+        int bitIndex;  // Bit index
+    } SymbolPosition;
+
+    /**
+     * @struct WaveFFTData
+     * @brief Stores the data related to FFT waveform animation, including previous, target, and current values, as well as animation steps.
+     */
+    typedef struct
+    {
+        int last_value;     // Last FFT value
+        int target_value;   // Target FFT value
+        int current_value;  // Current FFT value
+        int animation_step; // Animation step
+    } WaveFFTData;
+
+    /**
+     * @struct ContentData
+     * @brief Stores the data related to content display and animation, including current and last content, animation steps, and animation type.
+     */
+    typedef struct
+    {
+        char current_content;
+        char last_content;
+        int animation_step;
+        NumAni animation_type;
+    } ContentData;
+
 private:
     bool wavebusy = true;
     const int wave_total_steps = 5; // Total number of animation steps
@@ -227,7 +228,7 @@ private:
         0xe248f0, // Z
     };
     // Position of each symbol in the display buffer
-    HNA_SymbolPosition symbolPositions[100] = {
+    SymbolPosition symbolPositions[100] = {
         {0, 2},     // R_OUTER_B
         {0, 4},     // R_OUTER_A
         {0, 8},     // R_CENTER
@@ -344,9 +345,9 @@ public:
      * @param start The starting position to display the string.
      * @param buf The string to be displayed.
      * @param size The size of the string.
-     * @param ani The animation type for the content display, default is HNA_CLOCKWISE.
+     * @param ani The animation type for the content display, default is CLOCKWISE.
      */
-    void content_show(int start, char *buf, int size, HNA_NumAni ani = HNA_CLOCKWISE);
+    void content_show(int start, char *buf, int size, NumAni ani = CLOCKWISE);
 
     /**
      * @brief Displays a notification string with a specified timeout.
@@ -354,10 +355,10 @@ public:
      * @param start The starting position to display the notification string.
      * @param buf The notification string to be displayed.
      * @param size The size of the notification string.
-     * @param ani The animation type for the notification display, default is HNA_CLOCKWISE.
+     * @param ani The animation type for the notification display, default is CLOCKWISE.
      * @param timeout The time (in milliseconds) to inhibit other content display, default is 2000.
      */
-    void noti_show(int start, char *buf, int size, HNA_NumAni ani = HNA_CLOCKWISE, int timeout = 2000);
+    void noti_show(int start, char *buf, int size, NumAni ani = CLOCKWISE, int timeout = 2000);
 
     /**
      * @brief Displays a symbol on the screen.
@@ -368,7 +369,7 @@ public:
      * @param symbol The enumeration value of the symbol to be displayed.
      * @param is_on A boolean indicating whether the symbol should be shown (true) or hidden (false).
      */
-    void symbolhelper(HNA_Symbols symbol, bool is_on);
+    void symbolhelper(Symbols symbol, bool is_on);
 
     /**
      * @brief Displays a dot matrix pattern on the screen.
@@ -459,7 +460,7 @@ protected:
      * @param byteIndex A pointer to an integer used to store the byte index of the symbol.
      * @param bitIndex A pointer to an integer used to store the bit index of the symbol.
      */
-    void find_enum_code(HNA_Symbols flag, int *byteIndex, int *bitIndex);
+    void find_enum_code(Symbols flag, int *byteIndex, int *bitIndex);
 };
 
 #endif // _HNA_16MM65T_H_

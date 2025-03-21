@@ -111,7 +111,7 @@ void HNA_16MM65T::contentanimate()
             uint32_t before_raw_code = find_hex_code(currentData[i].last_content);
             uint32_t raw_code = find_hex_code(currentData[i].current_content);
             uint32_t code = raw_code;
-            if (currentData[i].animation_type == HNA_CLOCKWISE)
+            if (currentData[i].animation_type == CLOCKWISE)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -144,7 +144,7 @@ void HNA_16MM65T::contentanimate()
                     break;
                 }
             }
-            else if (currentData[i].animation_type == HNA_ANTICLOCKWISE)
+            else if (currentData[i].animation_type == ANTICLOCKWISE)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -177,7 +177,7 @@ void HNA_16MM65T::contentanimate()
                     break;
                 }
             }
-            else if (currentData[i].animation_type == HNA_UP2DOWN)
+            else if (currentData[i].animation_type == UP2DOWN)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -198,7 +198,7 @@ void HNA_16MM65T::contentanimate()
                     break;
                 }
             }
-            else if (currentData[i].animation_type == HNA_DOWN2UP)
+            else if (currentData[i].animation_type == DOWN2UP)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -219,7 +219,7 @@ void HNA_16MM65T::contentanimate()
                     break;
                 }
             }
-            else if (currentData[i].animation_type == HNA_LEFT2RT)
+            else if (currentData[i].animation_type == LEFT2RT)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -240,7 +240,7 @@ void HNA_16MM65T::contentanimate()
                     break;
                 }
             }
-            else if (currentData[i].animation_type == HNA_RT2LEFT)
+            else if (currentData[i].animation_type == RT2LEFT)
             {
                 switch (currentData[i].animation_step)
                 {
@@ -293,7 +293,7 @@ HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host
             vfd->symbolhelper(LBAR_RBAR, true);
             while (true)
             {
-                vfd->refrash(vfd->gram);
+                vfd->refrash(vfd->internal_gram);
                 vfd->contentanimate();
                 vfd->waveanimate();
                 vTaskDelay(pdMS_TO_TICKS(10));
@@ -329,7 +329,7 @@ HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324(spi_device)
             vfd->symbolhelper(LBAR_RBAR, true);
             while (true)
             {
-                vfd->refrash(vfd->gram);
+                vfd->refrash(vfd->internal_gram);
                 vfd->contentanimate();
                 vfd->waveanimate();
                 vTaskDelay(pdMS_TO_TICKS(10));
@@ -390,10 +390,10 @@ void HNA_16MM65T::spectrum_show(float *buf, int size)
 }
 
 /**
- * @brief Controls the blinking effect related to time and toggles the display state of specific HNA_Symbols.
+ * @brief Controls the blinking effect related to time and toggles the display state of specific Symbols.
  *
  * If there is a content inhibition time, the function returns directly. Otherwise, it toggles the time mark state
- * and updates the display of corresponding HNA_Symbols according to the mark state.
+ * and updates the display of corresponding Symbols according to the mark state.
  */
 void HNA_16MM65T::time_blink()
 {
@@ -420,7 +420,7 @@ void HNA_16MM65T::time_blink()
  * @param size The number of characters to be displayed.
  * @param ani The animation type enumeration value.
  */
-void HNA_16MM65T::content_show(int start, char *buf, int size, HNA_NumAni ani)
+void HNA_16MM65T::content_show(int start, char *buf, int size, NumAni ani)
 {
     if (content_inhibit_time != 0)
     {
@@ -449,7 +449,7 @@ void HNA_16MM65T::content_show(int start, char *buf, int size, HNA_NumAni ani)
  * @param ani The animation type enumeration value.
  * @param timeout The content inhibition time (in milliseconds).
  */
-void HNA_16MM65T::noti_show(int start, char *buf, int size, HNA_NumAni ani, int timeout)
+void HNA_16MM65T::noti_show(int start, char *buf, int size, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     for (size_t i = 0; i < size && (start + i) < CONTENT_SIZE; i++)
@@ -473,7 +473,7 @@ void HNA_16MM65T::test()
         {
             HNA_16MM65T *vfd = static_cast<HNA_16MM65T *>(arg);
             int rollcounter = 0;
-            HNA_NumAni num_ani = HNA_ANTICLOCKWISE;
+            NumAni num_ani = ANTICLOCKWISE;
             char tempstr[CONTENT_SIZE];
             int64_t start_time = esp_timer_get_time() / 1000;
             while (1)
@@ -483,7 +483,7 @@ void HNA_16MM65T::test()
 
                 if (elapsed_time >= 5000)
                 {
-                    num_ani = (HNA_NumAni)((int)(num_ani + 1) % HNA_MAX);
+                    num_ani = (NumAni)((int)(num_ani + 1) % MAX);
                     start_time = current_time;
                 }
 
@@ -528,7 +528,7 @@ void HNA_16MM65T::cali()
             int index = 0, data = 0;
             sscanf((char *)recv_data, "%d:%X", &index, &data);
             printf("Parsed contents: %d and 0x%02X\n", index, data);
-            gram[index] = data;
+            internal_gram[index] = data;
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -579,9 +579,9 @@ void HNA_16MM65T::charhelper(int index, uint32_t code)
 {
     if (index >= 10)
         return;
-    gram[NUM_BEGIN + index * 3 + 2] = code >> 16;
-    gram[NUM_BEGIN + index * 3 + 1] = code >> 8;
-    gram[NUM_BEGIN + index * 3 + 0] = code & 0xff;
+    internal_gram[NUM_BEGIN + index * 3 + 2] = code >> 16;
+    internal_gram[NUM_BEGIN + index * 3 + 1] = code >> 8;
+    internal_gram[NUM_BEGIN + index * 3 + 0] = code & 0xff;
 }
 
 /**
@@ -594,7 +594,7 @@ void HNA_16MM65T::charhelper(int index, uint32_t code)
  * @param byteIndex A pointer to an integer used to store the byte index of the symbol.
  * @param bitIndex A pointer to an integer used to store the bit index of the symbol.
  */
-void HNA_16MM65T::find_enum_code(HNA_Symbols flag, int *byteIndex, int *bitIndex)
+void HNA_16MM65T::find_enum_code(Symbols flag, int *byteIndex, int *bitIndex)
 {
     *byteIndex = symbolPositions[flag].byteIndex;
     *bitIndex = symbolPositions[flag].bitIndex;
@@ -609,18 +609,18 @@ void HNA_16MM65T::find_enum_code(HNA_Symbols flag, int *byteIndex, int *bitIndex
  * @param symbol The symbol enumeration value of the symbol to be controlled.
  * @param is_on A boolean value indicating whether the symbol should be displayed (true for display, false for hiding).
  */
-void HNA_16MM65T::symbolhelper(HNA_Symbols symbol, bool is_on)
+void HNA_16MM65T::symbolhelper(Symbols symbol, bool is_on)
 {
-    if (symbol >= HNA_SYMBOL_MAX)
+    if (symbol >= SYMBOL_MAX)
         return;
 
     int byteIndex, bitIndex;
     find_enum_code(symbol, &byteIndex, &bitIndex);
 
     if (is_on)
-        gram[byteIndex] |= bitIndex;
+        internal_gram[byteIndex] |= bitIndex;
     else
-        gram[byteIndex] &= ~bitIndex;
+        internal_gram[byteIndex] &= ~bitIndex;
 }
 
 /**
@@ -633,25 +633,25 @@ void HNA_16MM65T::symbolhelper(HNA_Symbols symbol, bool is_on)
  */
 void HNA_16MM65T::dotshelper(Dots dot)
 {
-    gram[1] &= ~0xF8;
-    gram[2] &= ~0xF;
+    internal_gram[1] &= ~0xF8;
+    internal_gram[2] &= ~0xF;
 
     switch (dot)
     {
     case DOT_MATRIX_UP:
-        gram[1] |= 0x78;
+        internal_gram[1] |= 0x78;
         break;
     case DOT_MATRIX_NEXT:
-        gram[1] |= 0xD0;
-        gram[2] |= 0xA;
+        internal_gram[1] |= 0xD0;
+        internal_gram[2] |= 0xA;
         break;
     case DOT_MATRIX_PAUSE:
-        gram[1] |= 0xB2;
-        gram[2] |= 0x1;
+        internal_gram[1] |= 0xB2;
+        internal_gram[2] |= 0x1;
         break;
     case DOT_MATRIX_FILL:
-        gram[1] |= 0xF8;
-        gram[2] |= 0x7;
+        internal_gram[1] |= 0xF8;
+        internal_gram[2] |= 0x7;
         break;
     }
 }
@@ -667,7 +667,7 @@ void HNA_16MM65T::dotshelper(Dots dot)
  */
 void HNA_16MM65T::wavehelper(int index, int level)
 {
-    static HNA_SymbolPosition wavePositions[] = {
+    static SymbolPosition wavePositions[] = {
         {33, 0x10},
         {33, 8},
         {33, 4},
@@ -690,14 +690,14 @@ void HNA_16MM65T::wavehelper(int index, int level)
     int byteIndex = wavePositions[index].byteIndex, bitIndex = wavePositions[index].bitIndex;
 
     if (!wavebusy)
-        gram[byteIndex + 2] |= 0x80;
+        internal_gram[byteIndex + 2] |= 0x80;
 
     for (size_t i = 0; i < 7; i++)
     {
         if ((i) >= (8 - level) && level > 1)
-            gram[byteIndex] |= bitIndex;
+            internal_gram[byteIndex] |= bitIndex;
         else
-            gram[byteIndex] &= ~bitIndex;
+            internal_gram[byteIndex] &= ~bitIndex;
 
         bitIndex <<= 3;
         if (bitIndex > 0xFF)
@@ -730,15 +730,15 @@ void HNA_16MM65T::corewavehelper(int l_level, int r_level)
     else
         return;
 
-    gram[0] &= 0x80;
-    gram[COREWAVE_BEGIN] = gram[COREWAVE_BEGIN + 1] = gram[COREWAVE_BEGIN + 2] = 0;
+    internal_gram[0] &= 0x80;
+    internal_gram[COREWAVE_BEGIN] = internal_gram[COREWAVE_BEGIN + 1] = internal_gram[COREWAVE_BEGIN + 2] = 0;
     if (wavebusy)
     {
         uint16_t core_level = (((1 << 3) - 1) << 8) | ((1 << 3) - 1);
         core_level = (core_level << rollcount) | (core_level >> (8 - rollcount));
         rollcount = (rollcount + 1) % 8;
-        gram[COREWAVE_BEGIN + 1] = core_level >> 8;
-        gram[COREWAVE_BEGIN + 1 + 1] = core_level & 0xFF;
+        internal_gram[COREWAVE_BEGIN + 1] = core_level >> 8;
+        internal_gram[COREWAVE_BEGIN + 1 + 1] = core_level & 0xFF;
         return;
     }
     if (l_level > 8)
@@ -751,62 +751,62 @@ void HNA_16MM65T::corewavehelper(int l_level, int r_level)
     rollcount = (rollcount + 1) % 8;
 
     if (l_level > 1)
-        gram[0] |= 0x40;
+        internal_gram[0] |= 0x40;
     if (l_level > 3)
-        gram[0] |= 0x20;
+        internal_gram[0] |= 0x20;
     if (l_level > 5)
-        gram[0] |= 0x10;
+        internal_gram[0] |= 0x10;
 
     if (r_level > 1)
-        gram[0] |= 0x8;
+        internal_gram[0] |= 0x8;
     if (r_level > 3)
-        gram[0] |= 0x4;
+        internal_gram[0] |= 0x4;
     if (r_level > 5)
-        gram[0] |= 0x2;
+        internal_gram[0] |= 0x2;
 
     if (l_level > 3 || r_level > 3)
     {
-        gram[COREWAVE_BEGIN + 1] = core_level >> 8;
-        gram[COREWAVE_BEGIN + 1 + 1] = core_level & 0x3F;
+        internal_gram[COREWAVE_BEGIN + 1] = core_level >> 8;
+        internal_gram[COREWAVE_BEGIN + 1 + 1] = core_level & 0x3F;
     }
 
-    gram[COREWAVE_BEGIN + 1 + 1] |= 0x80;
+    internal_gram[COREWAVE_BEGIN + 1 + 1] |= 0x80;
 
     if (l_level > 2 || r_level > 2)
     {
-        gram[COREWAVE_BEGIN + 1 + 1] |= 0x40;
+        internal_gram[COREWAVE_BEGIN + 1 + 1] |= 0x40;
     }
 
     if (l_level > 4)
     {
-        gram[COREWAVE_BEGIN] |= 0x40;
+        internal_gram[COREWAVE_BEGIN] |= 0x40;
     }
     if (r_level > 4)
     {
-        gram[COREWAVE_BEGIN] |= 0x10;
+        internal_gram[COREWAVE_BEGIN] |= 0x10;
     }
     if (l_level > 5)
     {
-        gram[COREWAVE_BEGIN] |= 0x20;
+        internal_gram[COREWAVE_BEGIN] |= 0x20;
     }
     if (r_level > 5)
     {
-        gram[COREWAVE_BEGIN] |= 0x80;
+        internal_gram[COREWAVE_BEGIN] |= 0x80;
     }
     if (l_level > 6)
     {
-        gram[COREWAVE_BEGIN] |= 0x4;
+        internal_gram[COREWAVE_BEGIN] |= 0x4;
     }
     if (r_level > 6)
     {
-        gram[COREWAVE_BEGIN] |= 0x8;
+        internal_gram[COREWAVE_BEGIN] |= 0x8;
     }
     if (l_level > 7)
     {
-        gram[COREWAVE_BEGIN] |= 0x1;
+        internal_gram[COREWAVE_BEGIN] |= 0x1;
     }
     if (r_level > 7)
     {
-        gram[COREWAVE_BEGIN] |= 0x2;
+        internal_gram[COREWAVE_BEGIN] |= 0x2;
     }
 }

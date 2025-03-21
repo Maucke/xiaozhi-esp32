@@ -40,7 +40,7 @@ PT6324::PT6324(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t 
     spi_bus_config_t buscfg = {0};
 
     // Log the initialization process
-    ESP_LOGI(TAG, "Initialize VFD SPI bus");
+    ESP_LOGI(TAG, "Initialize PT6324 SPI bus");
 
     // Set the clock and data pins for the SPI bus
     buscfg.sclk_io_num = clk;
@@ -69,7 +69,6 @@ void PT6324::init()
 {
     // Define the initialization data to set the brightness
     uint8_t data[] = {0x0F, 0x0F, 0x40};
-    dimmen = true;
     // Send the initialization data to the PT6324 device
     write_data8(data, (sizeof data));
 }
@@ -79,18 +78,14 @@ void PT6324::setbrightness(uint8_t brightness)
     dimming = brightness * 8 / 100;
     if (dimming > 7)
         dimming = 7;
-    // else if (dimming < 1)
-    //     dimming = 1;
     // ESP_LOGI(TAG, "dimming %d", dimming);
 }
 
 void PT6324::setsleep(bool en)
 {
-    dimmen = !en;
-    if (!dimmen)
+    if (en)
     {
-        memset(gram, 0, sizeof gram);
-        // refrash(gram);
+        memset(internal_gram, 0, sizeof internal_gram);
     }
 }
 
@@ -112,7 +107,7 @@ void PT6324::refrash(uint8_t *gram)
     // Define the command to turn on the display
     uint8_t data[1] = {0x80};
 
-    data[0] |= dimming | (dimmen ? 0x8 : 0);
+    data[0] |= dimming | (dimming ? 0x8 : 0);
 
     // Send the display on command to the PT6324 device
     write_data8(data, (sizeof data));

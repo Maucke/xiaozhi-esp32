@@ -18,30 +18,38 @@
 #include <esp_log.h>
 #include "spectrumdisplay.h"
 
+#define CHAR_COUNT (62 + 1)
+#define FORD_WIDTH 142
+#define FORD_HEIGHT 16
+#define NUM_SIZE (9)
+
+class FORD_VFD
+{
+public:
 typedef struct
 {
     int byteIndex; // Byte index
     int bitIndex;  // Bit index
-} FORD_SymbolPosition;
+} SymbolPosition;
 
 typedef enum
 {
-    FORD_IDLE = -1,
-    FORD_CONTENT,
-    FORD_FFT
-} FORD_Mode;
+    IDLE = -1,
+    CONTENT,
+    FFT
+} Mode;
 
 typedef enum
 {
-    FORD_NONE = -1,
-    FORD_CLOCKWISE,
-    FORD_ANTICLOCKWISE,
-    FORD_UP2DOWN,
-    FORD_DOWN2UP,
-    FORD_LEFT2RT,
-    FORD_RT2LEFT,
-    FORD_MAX
-} FORD_NumAni;
+    NONE = -1,
+    CLOCKWISE,
+    ANTICLOCKWISE,
+    UP2DOWN,
+    DOWN2UP,
+    LEFT2RT,
+    RT2LEFT,
+    MAX
+} NumAni;
 
 typedef enum
 {
@@ -63,31 +71,23 @@ typedef enum
     CD1,    // CD
     CD2,    // CD
     CD3,    // CD
-    FORD_SYMBOL_MAX
-} FORD_Symbols;
+    SYMBOL_MAX
+} Symbols;
 
 typedef struct
 {
     char current_content;
     char last_content;
     int animation_step;
-    FORD_NumAni animation_type;
+    NumAni animation_type;
 } NumberData;
-
-#define CHAR_COUNT (62 + 1)
-#define FORD_WIDTH 142
-#define FORD_HEIGHT 16
-
-class FORD_VFD
-{
-#define NUM_SIZE (9)
 public:
     FORD_VFD(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
     FORD_VFD(spi_device_handle_t spi_device);
-    void draw_point(int x, int y, uint8_t dot, FORD_Mode mode = FORD_CONTENT);
+    void draw_point(int x, int y, uint8_t dot, Mode mode = CONTENT);
     void clear();
-    void find_enum_code(FORD_Symbols flag, int *byteIndex, int *bitIndex);
-    void symbolhelper(FORD_Symbols symbol, bool is_on);
+    void find_enum_code(Symbols flag, int *byteIndex, int *bitIndex);
+    void symbolhelper(Symbols symbol, bool is_on);
 
     void charhelper(int index, char ch);
     void charhelper(int index, uint8_t code);
@@ -95,10 +95,10 @@ public:
     void refrash(uint8_t *gram, int size);
 
     void time_blink();
-    void number_show(int start, char *buf, int size, FORD_NumAni ani = FORD_CLOCKWISE);
+    void number_show(int start, char *buf, int size, NumAni ani = CLOCKWISE);
     uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void test();
-    void setmode(FORD_Mode mode)
+    void setmode(Mode mode)
     {
         _mode = mode;
     }
@@ -114,7 +114,7 @@ protected:
     void setbrightness(uint8_t brightness);
 
 private:
-    FORD_Mode _mode = FORD_CONTENT;
+    Mode _mode = CONTENT;
     gpio_num_t _cs;
     const uint8_t init_data_block0[102] = {0};
     const uint8_t init_data_block1[4] = {0x01, 0xa8, 0x4c, 0x80};
@@ -214,7 +214,7 @@ private:
         0x5b  // Z
     };
 
-    FORD_SymbolPosition symbolPositions[100] = {
+    SymbolPosition symbolPositions[100] = {
         {272, 0x20}, // 冒号1
         {816, 0x20}, // 冒号2
         {270, 0x40}, // 点1
