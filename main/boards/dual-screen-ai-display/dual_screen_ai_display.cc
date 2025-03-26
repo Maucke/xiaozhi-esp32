@@ -35,6 +35,8 @@
 #include "hna_16mm65t.h"
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
 #include "bt247gn.h"
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+#include "boe_48_1504fn.h"
 #endif
 #include "spectrumdisplay.h"
 #include "mpu6050.h"
@@ -79,6 +81,10 @@ class CustomLcdDisplay : public QspiLcdDisplay
     ,
                          public Led,
                          public BT247GN
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+    ,
+                         public Led,
+                         public BOE_48_1504FN
 #endif
 {
 private:
@@ -132,6 +138,9 @@ public:
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
           ,
           HNA_16MM65T(spidevice)
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+          ,
+          BOE_48_1504FN(spidevice)
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
           ,
           BT247GN(spidevice)
@@ -659,9 +668,20 @@ public:
         setsleep(en);
     }
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-    void SetSubSleep(bool en = true) {}
+    void SetSubSleep(bool en = true) { setsleep(en); }
 
     void SetSubBacklight(uint8_t brightness) {}
+
+    virtual void OnStateChanged() override {}
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+    void SetSubSleep(bool en = true)
+    {
+    }
+
+    void SetSubBacklight(uint8_t brightness)
+    {
+    }
+
     virtual void OnStateChanged() override {}
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
     void SetSubSleep(bool en = true)
@@ -824,6 +844,7 @@ private:
             display_->symbolhelper(HNA_16MM65T::USB2, false);
         else
             display_->symbolhelper(HNA_16MM65T::USB2, true);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
 #endif
     }
 
@@ -933,6 +954,7 @@ private:
         float voltage = 0.0f, current = 0.0f;
         for (size_t i = 0; i < 3; i++)
         {
+            ina3221->setShuntRes(i, 10);
             voltage = ina3221->getBusVoltage(i);
             current = ina3221->getCurrent(i);
             ESP_LOGI(TAG, "channel: %d, voltage: %.2fv, current: %.2fa", i, voltage, current);
@@ -971,24 +993,21 @@ private:
         spi_bus_config_t buscfg = {0};
         spi_device_handle_t spi_device = nullptr;
 
+#if SUB_DISPLAY_EN
+
         // Log the initialization process
         ESP_LOGI(TAG, "Initialize VFD SPI bus");
-
-        // Set the clock and data pins for the SPI bus
-        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
-        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
-#if SUB_DISPLAY_EN && FORD_VFD_EN
         if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
         {
             gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
             gpio_set_level(PIN_NUM_VFD_RE, 1);
         }
-        // Log the initialization process
-        ESP_LOGI(TAG, "Initialize VFD SPI bus");
-
         // Set the clock and data pins for the SPI bus
         buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
         buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
+#endif
+#if SUB_DISPLAY_EN && FORD_VFD_EN
+
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 1024;
 
@@ -1007,17 +1026,7 @@ private:
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
-        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
-        {
-            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
-            gpio_set_level(PIN_NUM_VFD_RE, 1);
-        }
-        // Log the initialization process
-        ESP_LOGI(TAG, "Initialize VFD SPI bus");
 
-        // Set the clock and data pins for the SPI bus
-        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
-        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
 
@@ -1036,25 +1045,34 @@ private:
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
-        {
-            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
-            gpio_set_level(PIN_NUM_VFD_RE, 1);
-        }
-        // Log the initialization process
-        ESP_LOGI(TAG, "Initialize VFD SPI bus");
 
-        // Set the clock and data pins for the SPI bus
-        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
-        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
 
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
-            .mode = 2,                      // Set the SPI mode to 3
+            .mode = 0,                      // Set the SPI mode to 1
+            .clock_speed_hz = 12000000,     // Set the clock speed to 1MHz
+            .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
+            .queue_size = 7,
+        };
+
+        // Initialize the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_initialize(VFD_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+        // Add the PT6324 device to the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+
+        // Set the maximum transfer size in bytes
+        buscfg.max_transfer_sz = 256;
+
+        // Initialize the SPI device interface configuration structure
+        spi_device_interface_config_t devcfg = {
+            .mode = 3,                      // Set the SPI mode to 3
             .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
+            .flags = SPI_DEVICE_BIT_LSBFIRST,
             .queue_size = 7,
         };
 
@@ -1164,7 +1182,9 @@ private:
         (esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, &tp));
 #endif
         display_ = new CustomLcdDisplay(panel_io, panel, tp,
-                                        DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, spi_device);
+                                        DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
+                                        DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
+                                        DISPLAY_SWAP_XY, spi_device);
         if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
         {
             ESP_LOGI(TAG, "Enable amoled power");
@@ -1281,10 +1301,11 @@ public:
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
         pcf8574->writeGpio(OLED_EN, 1);
-        pcf8574->writeGpio(VFD_EN, 1);
+        pcf8574->writeGpio(VFD_EN, 0);
         pcf8574->writeGpio(SD_EN, 1);
-#endif
         vTaskDelay(pdMS_TO_TICKS(120));
+        pcf8574->writeGpio(VFD_EN, 1);
+#endif
 
         xTaskCreate([](void *arg)
                     { sntp_set_time_sync_notification_cb([](struct timeval *t) {
@@ -1480,7 +1501,7 @@ public:
     virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
     {
         static int last_level = 0;
-        int bat_v = ina3221->getBusVoltage(BAT_PW);
+        int bat_v = ina3221->getBusVoltage(BAT_PW) * 1000;
         int new_level;
         if (last_level >= 100 && bat_v >= V1_DOWN)
         {
@@ -1526,13 +1547,13 @@ public:
             discharging = true;
         else
             discharging = false;
-        // float voltage = 0.0f, current = 0.0f;
-        // for (size_t i = 0; i < 3; i++)
-        // {
-        //     voltage = ina3221->getBusVoltage(i);
-        //     current = ina3221->getCurrent(i);
-        //     ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
-        // }
+        float voltage = 0.0f, current = 0.0f;
+        for (size_t i = 0; i < 3; i++)
+        {
+            voltage = ina3221->getBusVoltage(i);
+            current = ina3221->getCurrent(i);
+            ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        }
         return true;
     }
 #else
@@ -1604,7 +1625,6 @@ public:
             last_charging = charging;
             // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
         }
-        display_->init();
         discharging = !charging;
         return true;
     }
@@ -1635,6 +1655,7 @@ public:
 
     virtual bool TimeUpdate() override
     {
+        display_->test();
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         static struct tm time_user;
         time_t now = time(NULL);

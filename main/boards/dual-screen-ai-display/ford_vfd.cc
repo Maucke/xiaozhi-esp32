@@ -73,12 +73,13 @@ void FORD_VFD::write_data8(uint8_t *dat, int len)
 
 void FORD_VFD::setbrightness(uint8_t brightness)
 {
-	dimming = brightness * 255 / 100;
+	dimming = brightness * 127 / 100;
+	ESP_LOGI(TAG, "FORD_VFD dimming: %d, %d", dimming, brightness);
 }
 
 void FORD_VFD::refrash(uint8_t *gram, int size)
 {
-	uint8_t data[2] = {0xcf, dimming};
+	uint8_t data[2] = {0xcf, (uint8_t)(dimming & 0xFC)};
 
 	write_data8((uint8_t *)data, 2);
 	write_data8((uint8_t *)gram, size);
@@ -403,8 +404,10 @@ void FORD_VFD::draw_point(int x, int y, uint8_t dot, Mode mode)
 void FORD_VFD::clear()
 {
 #if 1
-	for (int y = 0; y < FORD_HEIGHT; ++y) {
-		for (int x = 0; x < FORD_WIDTH; ++x) {
+	for (int y = 0; y < FORD_HEIGHT; ++y)
+	{
+		for (int x = 0; x < FORD_WIDTH; ++x)
+		{
 			draw_point(x, y, 0, _mode);
 		}
 	}
@@ -547,11 +550,11 @@ void FORD_VFD::charhelper(int index, uint8_t code)
 
 void FORD_VFD::setsleep(bool en)
 {
-    if (en)
-    {
-        memset(gram, 0, sizeof gram);
-        // pt6324_refrash(gram);
-    }
+	if (en)
+	{
+		memset(gram, 0, sizeof gram);
+		// pt6324_refrash(gram);
+	}
 }
 
 void FORD_VFD::test()

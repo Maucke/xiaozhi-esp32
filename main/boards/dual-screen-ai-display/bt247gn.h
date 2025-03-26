@@ -34,7 +34,7 @@ private:
     void write_data8(uint8_t *dat, int len);
 
 protected:
-    uint8_t internal_gram[13][10] = {0};
+    uint8_t internal_gram[1 + 13 * 9] = {0};
     void refrash();
 };
 

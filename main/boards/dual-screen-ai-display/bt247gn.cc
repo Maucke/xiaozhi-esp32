@@ -66,18 +66,22 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
 
 void BT247GN::test()
 {
-    for (size_t i = 0; i < 13; i++)
+    static bool face = false;
+    for (size_t i = 1; i < sizeof internal_gram; i++)
     {
-        for (size_t j = 1; j < 10; j++)
-        {
-            internal_gram[i][j] = rand();
-        }
+        if (face)
+            internal_gram[i] = rand();
+        else
+            internal_gram[i] = 0xFF;
     }
+    face = !face;
+    refrash();
 }
 
 void BT247GN::init()
 {
-    test();
+    // uint8_t val = 0xFF;
+    // write_data8(&val, sizeof val);
     refrash();
 }
 
@@ -93,15 +97,12 @@ void BT247GN::setsleep(bool en)
 {
     if (en)
     {
-        memset(internal_gram, 0, sizeof internal_gram);
+        memset(internal_gram, 0, sizeof internal_gram);refrash();
     }
 }
 
 void BT247GN::refrash()
 {
-    for (size_t i = 0; i < 13; i++)
-    {
-        internal_gram[i][0] = i;
-        write_data8(internal_gram[i], 10);
-    }
+    internal_gram[0] = 0;
+    write_data8(internal_gram, sizeof internal_gram);
 }

@@ -43,6 +43,7 @@ public:
     void init();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
+    void test();
 
 private:
     uint8_t dimming = 0;

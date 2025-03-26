@@ -73,9 +73,26 @@ void PT6302::init()
 {
     setmode(PT6302::Mode::NORMAL);
     setgrnum(digits);
-    const uint8_t values[5] = {
-        0, 1, 2, 3, 4};
-    write_dcram(10, (uint8_t *)values, 5);
+    dimming = 7;
+    setdimming();
+}
+
+void PT6302::test()
+{
+    for (size_t i = 0; i < 10; i++)
+    {
+        internal_gram[i] = i + '0';
+    }
+    for (size_t i = 10; i < 25; i++)
+    {
+        internal_gram[i] = 0xff;
+    }
+    for (size_t i = 25; i < 25 + 25; i++)
+    {
+        internal_gram[i] = 0x55;
+    }
+
+    refrash(internal_gram);
 }
 
 void PT6302::write_dcram(int index, uint8_t *dat, int len)
@@ -121,7 +138,7 @@ void PT6302::setgrnum(unsigned int amount)
 
 void PT6302::setmode(Mode mode)
 {
-    uint8_t command = 0x7 | (uint8_t)mode;
+    uint8_t command = 0x70 | (uint8_t)mode;
     write_data8(&command, 1);
     return;
 }
@@ -130,9 +147,12 @@ void PT6302::refrash(Gram *gram)
 {
     if (gram == nullptr)
         return;
-    write_dcram(0, gram->number, 10);
-    write_adram(0, gram->symbol, 15);
     write_cgram(0, gram->cgram, 25);
+    write_dcram(0, gram->number, 10);
+    const uint8_t values[5] = {
+        0, 1, 2, 3, 4};
+    write_dcram(10, (uint8_t *)values, 5);
+    write_adram(0, gram->symbol, 15);
     setdimming();
 }
 

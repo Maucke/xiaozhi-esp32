@@ -16,7 +16,7 @@
 #include <esp_wifi.h>
 
 // Define the number of characters
-#define CHAR_COUNT (95)
+#define CHAR_COUNT (95+1)
 // Define the starting index of numbers
 #define NUM_BEGIN 3
 #define COREWAVE_BEGIN 39
@@ -416,14 +416,6 @@ public:
      * @param dot The enumeration value representing the state of the dot matrix.
      */
     void dotshelper(Dots dot);
-
-    /**
-     * @brief A test method used to test the display functionality.
-     *
-     * Creates a task that randomly generates spectrum data and calls the spectrum_show function to display it.
-     * It can also be used to test the digital display and dot matrix display.
-     */
-    void test();
 
     /**
      * @brief A calibration method used to configure the USB SERIAL JTAG and process received data.
