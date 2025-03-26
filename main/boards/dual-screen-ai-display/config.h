@@ -8,15 +8,15 @@
 
 // 副屏选择，如果有副屏，则需打开SUB_DISPLAY_EN和对应屏幕
 #define SUB_DISPLAY_EN 1
-#define FORD_VFD_EN 1
+#define FORD_VFD_EN 0
 #define HNA_16MM65T_EN 0
-#define BOE_48_1504FN 0
-#define FTB_13_BT_247GN 0
+#define BOE_48_1504FN_EN 0
+#define FTB_13_BT_247GN_EN 1
 
 // 板子选择
 #define ESP_D103 0
-#define ESP_DUAL_DISPLAY 0
-#define ESP_DUAL_DISPLAY_V2 1
+#define ESP_DUAL_DISPLAY 1
+#define ESP_DUAL_DISPLAY_V2 0
 
 #if ESP_D103
 #ifdef AUDIO_I2S_METHOD_SIMPLEX

@@ -33,6 +33,8 @@
 #include "ford_vfd.h"
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
 #include "hna_16mm65t.h"
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+#include "bt247gn.h"
 #endif
 #include "spectrumdisplay.h"
 #include "mpu6050.h"
@@ -73,6 +75,10 @@ class CustomLcdDisplay : public QspiLcdDisplay
     ,
                          public Led,
                          public HNA_16MM65T
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+    ,
+                         public Led,
+                         public BT247GN
 #endif
 {
 private:
@@ -126,6 +132,9 @@ public:
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
           ,
           HNA_16MM65T(spidevice)
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+          ,
+          BT247GN(spidevice)
 #endif
     {
         DisplayLockGuard lock(this);
@@ -139,6 +148,8 @@ public:
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         InitializeSubScreen();
         SetupSubUI();
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        init();
 #endif
     }
 
@@ -647,6 +658,11 @@ public:
     {
         setsleep(en);
     }
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+    void SetSubSleep(bool en = true) {}
+
+    void SetSubBacklight(uint8_t brightness) {}
+    virtual void OnStateChanged() override {}
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
     void SetSubSleep(bool en = true)
     {
@@ -798,12 +814,12 @@ private:
                 show_low_power_warning_ = false;
             }
         }
-#if FORD_VFD_EN
+#if SUB_DISPLAY_EN && FORD_VFD_EN
         if (!charging)
             display_->symbolhelper(FORD_VFD::AUX, false);
         else
             display_->symbolhelper(FORD_VFD::AUX, true);
-#else
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
         if (!charging)
             display_->symbolhelper(HNA_16MM65T::USB2, false);
         else
@@ -1011,6 +1027,34 @@ private:
             .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .flags = SPI_DEVICE_BIT_LSBFIRST,
+            .queue_size = 7,
+        };
+
+        // Initialize the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_initialize(VFD_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+        // Add the PT6324 device to the SPI bus with the specified configuration
+        ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
+        {
+            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
+            gpio_set_level(PIN_NUM_VFD_RE, 1);
+        }
+        // Log the initialization process
+        ESP_LOGI(TAG, "Initialize VFD SPI bus");
+
+        // Set the clock and data pins for the SPI bus
+        buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
+        buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
+        // Set the maximum transfer size in bytes
+        buscfg.max_transfer_sz = 256;
+
+        // Initialize the SPI device interface configuration structure
+        spi_device_interface_config_t devcfg = {
+            .mode = 2,                      // Set the SPI mode to 3
+            .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
+            .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .queue_size = 7,
         };
 
@@ -1482,7 +1526,6 @@ public:
             discharging = true;
         else
             discharging = false;
-
         // float voltage = 0.0f, current = 0.0f;
         // for (size_t i = 0; i < 3; i++)
         // {
@@ -1561,6 +1604,7 @@ public:
             last_charging = charging;
             // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
         }
+        display_->init();
         discharging = !charging;
         return true;
     }
