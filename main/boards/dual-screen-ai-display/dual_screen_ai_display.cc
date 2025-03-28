@@ -666,6 +666,56 @@ public:
         setsleep(en);
     }
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+
+#if CONFIG_USE_FFT_EFFECT
+    virtual void SpectrumShow(float *buf, int size) override
+    {
+        symbolhelper(Bar_1, false);
+        symbolhelper(Bar_2, false);
+        symbolhelper(Bar_3, false);
+        symbolhelper(Bar_4, false);
+        symbolhelper(Bar_5, false);
+        symbolhelper(Bar_6, false);
+        symbolhelper(Bar_7, false);
+        symbolhelper(Bar_8, false);
+        symbolhelper(Bar_9, false);
+        symbolhelper(Bar_10, false);
+
+        int fft_level = 0;
+        for (size_t i = size / 4; i < size * 3 / 4; i++)
+        {
+            fft_level += buf[i];
+        }
+        fft_level /= (size / 2);
+
+        if (fft_level > 5)
+            symbolhelper(Bar_1, true);
+        if (fft_level > 15)
+            symbolhelper(Bar_2, true);
+        if (fft_level > 25)
+            symbolhelper(Bar_3, true);
+        if (fft_level > 35)
+            symbolhelper(Bar_4, true);
+        if (fft_level > 45)
+            symbolhelper(Bar_5, true);
+        if (fft_level > 55)
+            symbolhelper(Bar_6, true);
+        if (fft_level > 65)
+            symbolhelper(Bar_7, true);
+        if (fft_level > 75)
+            symbolhelper(Bar_8, true);
+        if (fft_level > 85)
+            symbolhelper(Bar_9, true);
+        if (fft_level > 95)
+            symbolhelper(Bar_10, true);
+    }
+#endif
+
+    virtual void Notification(const std::string &content, int timeout = 2000) override
+    {
+        noti_show(10, (char *)content.c_str(), 10, BT247GN::UP2DOWN, timeout);
+    }
+
     void SetSubSleep(bool en = true)
     {
         setsleep(en);
@@ -673,6 +723,7 @@ public:
 
     void SetSubBacklight(uint8_t brightness)
     {
+        return;
         setbrightness(brightness);
     }
 
@@ -1378,7 +1429,7 @@ public:
                     {
                         CustomLcdDisplay *display = (CustomLcdDisplay*)Board::GetInstance().GetDisplay();
                         if(display != nullptr)
-                            display->Notification("SYNC TM OK", 1000);
+                            display->Notification("SYNC TM OK", 3000);
                         } 
                     });
         esp_netif_init();

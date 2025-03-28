@@ -75,6 +75,19 @@ BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 
 void BT247GN::init()
 {
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentPixelData[i].current_content = ' ';
+        currentPixelData[i].last_content = ' ';
+        tempPixelData[i].current_content = ' ';
+        tempPixelData[i].last_content = ' ';
+    }
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentNumData[i].current_content = ' ';
+        currentNumData[i].last_content = ' ';
+    }
+
     xTaskCreate(
         [](void *arg)
         {
@@ -488,7 +501,7 @@ void BT247GN::pixel_write(int x, int y, uint8_t *code, int len)
     temp_gram[0] |= (x & 0xF) << 1;
     temp_gram[0] |= y != 0;
     memcpy(temp_gram + 1, code, len * 5);
-    write_data8(temp_gram, len + 1);
+    write_data8(temp_gram, len * 5 + 1);
 }
 
 void BT247GN::pixel_write(int x, int y, char *ascii, int len)
