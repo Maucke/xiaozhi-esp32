@@ -95,7 +95,7 @@ void FORD_VFD::time_blink()
 
 void FORD_VFD::number_show(int start, char *buf, int size, NumAni ani)
 {
-	for (size_t i = 0; i < size && (start + i) < NUM_SIZE; i++)
+	for (size_t i = 0; i < size && (start + i) < NUM_COUNT; i++)
 	{
 		currentData[start + i].animation_type = ani;
 		currentData[start + i].current_content = buf[i];
@@ -118,7 +118,7 @@ void FORD_VFD::contentanimate()
 	else
 		return;
 
-	for (int i = 0; i < NUM_SIZE; i++)
+	for (int i = 0; i < NUM_COUNT; i++)
 	{
 		if (currentData[i].current_content != currentData[i].last_content)
 		{

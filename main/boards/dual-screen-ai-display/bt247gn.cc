@@ -30,6 +30,7 @@ void BT247GN::write_data8(uint8_t *dat, int len)
     spi_transaction_t *ret_trans;
     ESP_ERROR_CHECK(spi_device_get_trans_result(spi_device_, &ret_trans, portMAX_DELAY));
     assert(ret_trans == &t);
+    vTaskDelay(pdMS_TO_TICKS(10));
 
     return;
 }
@@ -54,14 +55,44 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
 
     // Initialize the SPI device interface configuration structure
     spi_device_interface_config_t devcfg = {
-        .mode = 2,                 // Set the SPI mode to 3
-        .clock_speed_hz = 1000000, // Set the clock speed to 1MHz
-        .spics_io_num = cs,        // Set the chip select pin
+        .mode = 0,                  // Set the SPI mode to 3
+        .clock_speed_hz = 12000000, // Set the clock speed to 1MHz
+        .spics_io_num = cs,         // Set the chip select pin
         .queue_size = 7,
     };
 
     // Add the BT247GN device to the SPI bus with the specified configuration
     ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
+    init();
+    ESP_LOGI(TAG, "BT247GN Initalized");
+}
+
+BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
+{
+    init();
+    ESP_LOGI(TAG, "BT247GN Initalized");
+}
+
+void BT247GN::init()
+{
+    xTaskCreate(
+        [](void *arg)
+        {
+            BT247GN *vfd = static_cast<BT247GN *>(arg);
+            while (true)
+            {
+                vfd->refrash();
+                vTaskDelay(pdMS_TO_TICKS(10));
+                vfd->pixelanimate();
+                vfd->numberanimate();
+            }
+            vTaskDelete(NULL);
+        },
+        "vfd",
+        4096,
+        this,
+        6,
+        nullptr);
 }
 
 void BT247GN::test()
@@ -78,13 +109,6 @@ void BT247GN::test()
     refrash();
 }
 
-void BT247GN::init()
-{
-    // uint8_t val = 0xFF;
-    // write_data8(&val, sizeof val);
-    refrash();
-}
-
 void BT247GN::setbrightness(uint8_t brightness)
 {
     dimming = brightness * 8 / 100;
@@ -97,12 +121,429 @@ void BT247GN::setsleep(bool en)
 {
     if (en)
     {
-        memset(internal_gram, 0, sizeof internal_gram);refrash();
+        memset(internal_gram, 0, sizeof internal_gram);
+        // refrash();
+    }
+}
+void BT247GN::noti_show(int start, char *buf, int size, NumAni ani, int timeout)
+{
+    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
+    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    {
+        currentPixelData[start + i].animation_type = ani;
+        currentPixelData[start + i].current_content = buf[i];
     }
 }
 
-void BT247GN::refrash()
+void BT247GN::pixel_show(int start, char *buf, int size, NumAni ani)
 {
-    internal_gram[0] = 0;
-    write_data8(internal_gram, sizeof internal_gram);
+    if (content_inhibit_time != 0)
+    {
+        for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+        {
+            tempPixelData[start + i].animation_type = ani;
+            tempPixelData[start + i].current_content = buf[i];
+        }
+        return;
+    }
+    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    {
+        currentPixelData[start + i].animation_type = ani;
+        currentPixelData[start + i].current_content = buf[i];
+    }
+}
+
+void BT247GN::num_show(int start, char *buf, int size, NumAni ani)
+{
+    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    {
+        currentNumData[start + i].animation_type = ani;
+        currentNumData[start + i].current_content = buf[i];
+    }
+}
+
+void BT247GN::pixelanimate()
+{
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+    int64_t elapsed_time = current_time - start_time;
+    uint8_t temp_code[5] = {0};
+
+    if (elapsed_time >= 30)
+        start_time = current_time;
+    else
+        return;
+
+    if (content_inhibit_time != 0)
+    {
+        elapsed_time = current_time - content_inhibit_time;
+        if (elapsed_time > 0)
+        {
+            for (size_t i = 0; i < PIXEL_COUNT; i++)
+            {
+                currentPixelData[i].last_content = currentPixelData[i].current_content;
+                currentPixelData[i].animation_type = tempPixelData[i].animation_type;
+                currentPixelData[i].current_content = tempPixelData[i].current_content;
+            }
+            content_inhibit_time = 0;
+        }
+    }
+
+    for (int i = 0; i < PIXEL_COUNT; i++)
+    {
+        if (currentPixelData[i].current_content != currentPixelData[i].last_content)
+        {
+            const uint8_t *before_raw_code = hex_codes[currentPixelData[i].last_content - ' '];
+            const uint8_t *raw_code = hex_codes[currentPixelData[i].current_content - ' '];
+            if (currentPixelData[i].animation_type == UP2DOWN)
+            {
+                for (int j = 0; j < 5; j++)
+                    temp_code[j] = (before_raw_code[i] << currentPixelData[i].animation_step) | (raw_code[i] >> (7 - currentPixelData[i].animation_step));
+
+                if (currentPixelData[i].animation_step >= 7)
+                    currentPixelData[i].animation_step = -1;
+            }
+            else if (currentPixelData[i].animation_type == DOWN2UP)
+            {
+                for (int j = 0; j < 5; j++)
+                    temp_code[j] = (before_raw_code[i] >> currentPixelData[i].animation_step) | (raw_code[i] << (7 - currentPixelData[i].animation_step));
+
+                if (currentPixelData[i].animation_step >= 7)
+                    currentPixelData[i].animation_step = -1;
+            }
+            else if (currentPixelData[i].animation_type == LEFT2RT)
+            {
+                switch (currentPixelData[i].animation_step)
+                {
+                case 0:
+                    for (int j = 0; j < 4; j++)
+                        temp_code[j] = before_raw_code[j + 1];
+                    for (int j = 4; j < 5; j++)
+                        temp_code[j] = raw_code[j - 4];
+                    break;
+                case 1:
+                    for (int j = 0; j < 3; j++)
+                        temp_code[j] = before_raw_code[j + 2];
+                    for (int j = 3; j < 5; j++)
+                        temp_code[j] = raw_code[j - 3];
+                    break;
+                case 2:
+                    for (int j = 0; j < 2; j++)
+                        temp_code[j] = before_raw_code[j + 3];
+                    for (int j = 2; j < 5; j++)
+                        temp_code[j] = raw_code[j - 2];
+                    break;
+                case 3:
+                    for (int j = 0; j < 1; j++)
+                        temp_code[j] = before_raw_code[j + 4];
+                    for (int j = 1; j < 5; j++)
+                        temp_code[j] = raw_code[j - 1];
+                    break;
+                default:
+                    currentPixelData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentPixelData[i].animation_type == RT2LEFT)
+            {
+                switch (currentPixelData[i].animation_step)
+                {
+                case 0:
+                    for (int j = 0; j < 4; j++)
+                        temp_code[j + 1] = before_raw_code[j];
+                    for (int j = 4; j < 5; j++)
+                        temp_code[j - 4] = raw_code[j];
+                    break;
+                case 1:
+                    for (int j = 0; j < 3; j++)
+                        temp_code[j + 2] = before_raw_code[j];
+                    for (int j = 3; j < 5; j++)
+                        temp_code[j - 3] = raw_code[j];
+                    break;
+                case 2:
+                    for (int j = 0; j < 2; j++)
+                        temp_code[j + 3] = before_raw_code[j];
+                    for (int j = 2; j < 5; j++)
+                        temp_code[j - 2] = raw_code[j];
+                    break;
+                case 3:
+                    for (int j = 0; j < 1; j++)
+                        temp_code[j + 4] = before_raw_code[j];
+                    for (int j = 1; j < 5; j++)
+                        temp_code[j - 1] = raw_code[j];
+                    break;
+                default:
+                    currentPixelData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else
+                currentPixelData[i].animation_step = -1;
+
+            if (currentPixelData[i].animation_step == -1)
+            {
+                currentPixelData[i].last_content = currentPixelData[i].current_content;
+                memcpy(temp_code, raw_code, sizeof temp_code);
+            }
+
+            pixelhelper(i, temp_code);
+
+            currentPixelData[i].animation_step++;
+        }
+    }
+}
+
+uint8_t BT247GN::contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask)
+{
+    return (raw & mask) | (before_raw & (~mask));
+}
+
+void BT247GN::numberanimate()
+{
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+    int64_t elapsed_time = current_time - start_time;
+
+    if (elapsed_time >= 30)
+        start_time = current_time;
+    else
+        return;
+
+    for (int i = 0; i < NUM_COUNT; i++)
+    {
+        if (currentNumData[i].current_content != currentNumData[i].last_content)
+        {
+            uint8_t before_raw_code = num_hex_codes[currentNumData[i].last_content - ' '];
+            uint8_t raw_code = num_hex_codes[currentNumData[i].current_content - ' '];
+            uint8_t code = raw_code;
+            if (currentNumData[i].animation_type == CLOCKWISE)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 1);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 3);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x43);
+                    break;
+                case 3:
+                    code = contentgetpart(raw_code, before_raw_code, 0x47);
+                    break;
+                case 4:
+                    code = contentgetpart(raw_code, before_raw_code, 0x4f);
+                    break;
+                case 5:
+                    code = contentgetpart(raw_code, before_raw_code, 0x5f);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentNumData[i].animation_type == ANTICLOCKWISE)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 1);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 0x21);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x61);
+                    break;
+                case 3:
+                    code = contentgetpart(raw_code, before_raw_code, 0x71);
+                    break;
+                case 4:
+                    code = contentgetpart(raw_code, before_raw_code, 0x79);
+                    break;
+                case 5:
+                    code = contentgetpart(raw_code, before_raw_code, 0x7d);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentNumData[i].animation_type == UP2DOWN)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 0x1);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 0x21);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x73);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentNumData[i].animation_type == DOWN2UP)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 0x8);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 0xc);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x5e);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentNumData[i].animation_type == LEFT2RT)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 0x10);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 0x18);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x7c);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentNumData[i].animation_type == RT2LEFT)
+            {
+                switch (currentNumData[i].animation_step)
+                {
+                case 0:
+                    code = contentgetpart(raw_code, before_raw_code, 0x4);
+                    break;
+                case 1:
+                    code = contentgetpart(raw_code, before_raw_code, 0xc);
+                    break;
+                case 2:
+                    code = contentgetpart(raw_code, before_raw_code, 0x5e);
+                    break;
+                default:
+                    currentNumData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else
+                currentNumData[i].animation_step = -1;
+
+            if (currentNumData[i].animation_step == -1)
+                currentNumData[i].last_content = currentNumData[i].current_content;
+
+            numhelper(i, code);
+            currentNumData[i].animation_step++;
+        }
+    }
+}
+void BT247GN::pixelhelper(int index, uint8_t *code)
+{
+    memcpy(pixel_gram + index * 5, code, 5);
+}
+
+void BT247GN::numhelper(int index, uint8_t code)
+{
+    num_gram[index] = code;
+}
+
+void BT247GN::symbolhelper(Icon_e icon, bool en)
+{
+    icon_gram[(int)icon] = en;
+}
+
+void BT247GN::refrash() // origin
+{
+    static uint8_t lastdimming = 0;
+    if (lastdimming != dimming)
+    {
+        lastdimming = dimming;
+        dimming_write(dimming);
+    }
+    pixel_write(0, 0, pixel_gram, (sizeof pixel_gram) / 5);
+    num_write(0, num_gram, sizeof num_gram);
+    icon_write(0, icon_gram, sizeof icon_gram);
+}
+
+void BT247GN::pixel_write(int x, int y, uint8_t *code, int len)
+{
+    uint8_t temp_gram[PIXEL_COUNT * 5 + 1];
+    temp_gram[0] = 0x20;
+    temp_gram[0] |= (x & 0xF) << 1;
+    temp_gram[0] |= y != 0;
+    memcpy(temp_gram + 1, code, len * 5);
+    write_data8(temp_gram, len + 1);
+}
+
+void BT247GN::pixel_write(int x, int y, char *ascii, int len)
+{
+    uint8_t temp_gram[PIXEL_COUNT + 1];
+    temp_gram[0] = 0xA0;
+    temp_gram[0] |= (x & 0xF) << 1;
+    temp_gram[0] |= y != 0;
+    memcpy(temp_gram + 1, ascii, len);
+    write_data8(temp_gram, len + 1);
+}
+
+void BT247GN::num_write(int x, uint8_t *code, int len)
+{
+    uint8_t temp_gram[NUM_COUNT + 1];
+    temp_gram[0] = 0x40;
+    temp_gram[0] |= (x & 0x1F);
+    memcpy(temp_gram + 1, code, len);
+    write_data8(temp_gram, len + 1);
+}
+
+void BT247GN::num_write(int x, char *ascii, int len)
+{
+    uint8_t temp_gram[NUM_COUNT + 1];
+    temp_gram[0] = 0x80;
+    temp_gram[0] |= (x & 0x1F);
+    memcpy(temp_gram + 1, ascii, len);
+    write_data8(temp_gram, len + 1);
+}
+
+void BT247GN::icon_write(Icon_e icon, bool en)
+{
+    uint8_t temp_gram[1 + 2];
+    temp_gram[0] = 0x60;
+    temp_gram[1] = (uint8_t)icon;
+    temp_gram[2] = en;
+
+    write_data8(temp_gram, 3);
+}
+
+void BT247GN::icon_write(int x, uint8_t *code, int len)
+{
+    uint8_t temp_gram[ICON_COUNT + 2];
+    temp_gram[0] = 0x60;
+    temp_gram[1] = x;
+    memcpy(temp_gram + 2, code, len);
+
+    write_data8(temp_gram, len + 2);
+}
+
+void BT247GN::dimming_write(int val)
+{
+    uint8_t temp_gram[2];
+    temp_gram[0] = 0xB0;
+    temp_gram[1] = val;
+
+    write_data8(temp_gram, 2);
 }

@@ -15,8 +15,17 @@
 #include <cmath>
 #include <esp_wifi.h>
 
+/**
+ * @class HNA_16MM65T
+ * @brief This class inherits from the PT6324 class and is used to control the display of a specific device.
+ *
+ * It provides methods for displaying spectrum, numbers, symbols, dot matrix and other information, and also supports animation effects.
+ */
+class HNA_16MM65T : protected PT6324
+{
+public:
 // Define the number of characters
-#define CHAR_COUNT (62 + 1)
+#define CHAR_SIZE (62 + 1)
 // Define the starting index of numbers
 #define NUM_BEGIN 3
 #define COREWAVE_BEGIN 39
@@ -26,16 +35,6 @@
 #define FFT_SIZE (12)
 // Define the number of digits
 #define CONTENT_SIZE (10)
-
-/**
- * @class HNA_16MM65T
- * @brief This class inherits from the PT6324 class and is used to control the display of a specific device.
- *
- * It provides methods for displaying spectrum, numbers, symbols, dot matrix and other information, and also supports animation effects.
- */
-class HNA_16MM65T : protected PT6324
-{
-    public:
     /**
      * @enum Dots
      * @brief Defines different states of the dot matrix.
@@ -166,7 +165,7 @@ private:
 
     // Hexadecimal code corresponding to each character
     // !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz
-    const unsigned int hex_codes[CHAR_COUNT] = {
+    const unsigned int hex_codes[CHAR_SIZE] = {
         0x000000, // ' '
         0x044020, // !
         0,        // "

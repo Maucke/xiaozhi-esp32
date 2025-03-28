@@ -20,22 +20,292 @@
 class BT247GN
 {
 public:
+#define PIXEL_COUNT (20)
+#define NUM_COUNT (21)
+#define ICON_COUNT (49)
+#define CHAR_SIZE (95 + 1)
+    //  Hexadecimal code corresponding to each character
+    //  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz
+    const uint8_t hex_codes[CHAR_SIZE][5] = {
+        {0x00, 0x00, 0x00, 0x00, 0x00}, /*" ", 32(ASCII)*/
+        {0x00, 0x00, 0x79, 0x00, 0x00}, /*"!", 33(ASCII)*/
+        {0x00, 0x60, 0x00, 0x60, 0x00}, /*""", 34(ASCII)*/
+        {0x22, 0x7F, 0x22, 0x7F, 0x22}, /*"#", 35(ASCII)*/
+        {0x12, 0x2A, 0x7F, 0x2A, 0x24}, /*"$", 36(ASCII)*/
+        {0x62, 0x64, 0x08, 0x13, 0x23}, /*"%", 37(ASCII)*/
+        {0x36, 0x49, 0x35, 0x02, 0x0D}, /*"&", 38(ASCII)*/
+        {0x00, 0x20, 0x40, 0x00, 0x00}, /*"'", 39(ASCII)*/
+        {0x00, 0x1C, 0x22, 0x41, 0x00}, /*"(", 40(ASCII)*/
+        {0x00, 0x41, 0x22, 0x1C, 0x00}, /*")", 41(ASCII)*/
+        {0x14, 0x08, 0x3E, 0x08, 0x14}, /*"*", 42(ASCII)*/
+        {0x08, 0x08, 0x3E, 0x08, 0x08}, /*"+", 43(ASCII)*/
+        {0x00, 0x01, 0x02, 0x00, 0x00}, /*",", 44(ASCII)*/
+        {0x08, 0x08, 0x08, 0x08, 0x08}, /*"-", 45(ASCII)*/
+        {0x00, 0x01, 0x00, 0x00, 0x00}, /*".", 46(ASCII)*/
+        {0x02, 0x04, 0x08, 0x10, 0x20}, /*"/", 47(ASCII)*/
+        {0x3E, 0x41, 0x41, 0x41, 0x3E}, /*"0", 48(ASCII)*/
+        {0x00, 0x20, 0x20, 0x7F, 0x00}, /*"1", 49(ASCII)*/
+        {0x23, 0x45, 0x49, 0x49, 0x31}, /*"2", 50(ASCII)*/
+        {0x22, 0x41, 0x49, 0x49, 0x36}, /*"3", 51(ASCII)*/
+        {0x0C, 0x14, 0x24, 0x7F, 0x04}, /*"4", 52(ASCII)*/
+        {0x72, 0x51, 0x51, 0x51, 0x4E}, /*"5", 53(ASCII)*/
+        {0x1E, 0x29, 0x49, 0x49, 0x06}, /*"6", 54(ASCII)*/
+        {0x40, 0x40, 0x47, 0x58, 0x60}, /*"7", 55(ASCII)*/
+        {0x36, 0x49, 0x49, 0x49, 0x36}, /*"8", 56(ASCII)*/
+        {0x30, 0x49, 0x49, 0x4A, 0x3C}, /*"9", 57(ASCII)*/
+        {0x00, 0x00, 0x11, 0x00, 0x00}, /*":", 58(ASCII)*/
+        {0x00, 0x01, 0x12, 0x00, 0x00}, /*";", 59(ASCII)*/
+        {0x00, 0x08, 0x14, 0x22, 0x41}, /*"<", 60(ASCII)*/
+        {0x14, 0x14, 0x14, 0x14, 0x14}, /*"=", 61(ASCII)*/
+        {0x41, 0x22, 0x14, 0x08, 0x00}, /*">", 62(ASCII)*/
+        {0x20, 0x40, 0x45, 0x48, 0x30}, /*"?", 63(ASCII)*/
+        {0x3E, 0x41, 0x4C, 0x52, 0x3E}, /*"@", 64(ASCII)*/
+        {0x1F, 0x24, 0x44, 0x24, 0x1F}, /*"A", 65(ASCII)*/
+        {0x41, 0x7F, 0x49, 0x49, 0x36}, /*"B", 66(ASCII)*/
+        {0x3E, 0x41, 0x41, 0x41, 0x22}, /*"C", 67(ASCII)*/
+        {0x41, 0x7F, 0x41, 0x41, 0x3E}, /*"D", 68(ASCII)*/
+        {0x7F, 0x49, 0x49, 0x49, 0x41}, /*"E", 69(ASCII)*/
+        {0x7F, 0x48, 0x48, 0x48, 0x40}, /*"F", 70(ASCII)*/
+        {0x3E, 0x41, 0x49, 0x49, 0x2E}, /*"G", 71(ASCII)*/
+        {0x7F, 0x08, 0x08, 0x08, 0x7F}, /*"H", 72(ASCII)*/
+        {0x00, 0x41, 0x7F, 0x41, 0x00}, /*"I", 73(ASCII)*/
+        {0x02, 0x01, 0x41, 0x7F, 0x40}, /*"J", 74(ASCII)*/
+        {0x7F, 0x08, 0x14, 0x22, 0x41}, /*"K", 75(ASCII)*/
+        {0x7F, 0x01, 0x01, 0x01, 0x01}, /*"L", 76(ASCII)*/
+        {0x7F, 0x20, 0x18, 0x20, 0x7F}, /*"M", 77(ASCII)*/
+        {0x7F, 0x10, 0x08, 0x04, 0x7F}, /*"N", 78(ASCII)*/
+        {0x3E, 0x41, 0x41, 0x41, 0x3E}, /*"O", 79(ASCII)*/
+        {0x7F, 0x48, 0x48, 0x48, 0x30}, /*"P", 80(ASCII)*/
+        {0x3E, 0x41, 0x45, 0x42, 0x3D}, /*"Q", 81(ASCII)*/
+        {0x7F, 0x48, 0x4C, 0x4A, 0x31}, /*"R", 82(ASCII)*/
+        {0x32, 0x49, 0x49, 0x49, 0x26}, /*"S", 83(ASCII)*/
+        {0x40, 0x40, 0x7F, 0x40, 0x40}, /*"T", 84(ASCII)*/
+        {0x7E, 0x01, 0x01, 0x01, 0x7E}, /*"U", 85(ASCII)*/
+        {0x78, 0x06, 0x01, 0x06, 0x78}, /*"V", 86(ASCII)*/
+        {0x7F, 0x02, 0x0C, 0x02, 0x7F}, /*"W", 87(ASCII)*/
+        {0x63, 0x14, 0x08, 0x14, 0x63}, /*"X", 88(ASCII)*/
+        {0x70, 0x08, 0x07, 0x08, 0x70}, /*"Y", 89(ASCII)*/
+        {0x43, 0x45, 0x49, 0x51, 0x61}, /*"Z", 90(ASCII)*/
+        {0x00, 0x7F, 0x41, 0x41, 0x00}, /*"[", 91(ASCII)*/
+        {0x20, 0x10, 0x08, 0x04, 0x02}, /*"\", 92(ASCII)*/
+        {0x00, 0x41, 0x41, 0x7F, 0x00}, /*"]", 93(ASCII)*/
+        {0x00, 0x20, 0x40, 0x20, 0x00}, /*"^", 94(ASCII)*/
+        {0x01, 0x01, 0x01, 0x01, 0x01}, /*"_", 95(ASCII)*/
+        {0x00, 0x00, 0x40, 0x20, 0x00}, /*"`", 96(ASCII)*/
+        {0x02, 0x15, 0x15, 0x15, 0x0F}, /*"a", 97(ASCII)*/
+        {0x7F, 0x11, 0x11, 0x11, 0x0E}, /*"b", 98(ASCII)*/
+        {0x0E, 0x11, 0x11, 0x11, 0x11}, /*"c", 99(ASCII)*/
+        {0x0E, 0x11, 0x11, 0x11, 0x7F}, /*"d", 100(ASCII)*/
+        {0x0E, 0x15, 0x15, 0x15, 0x0D}, /*"e", 101(ASCII)*/
+        {0x10, 0x10, 0x3F, 0x50, 0x50}, /*"f", 102(ASCII)*/
+        {0x19, 0x25, 0x25, 0x1E, 0x20}, /*"g", 103(ASCII)*/
+        {0x7F, 0x08, 0x10, 0x10, 0x0F}, /*"h", 104(ASCII)*/
+        {0x00, 0x11, 0x5F, 0x01, 0x00}, /*"i", 105(ASCII)*/
+        {0x02, 0x01, 0x11, 0x5E, 0x00}, /*"j", 106(ASCII)*/
+        {0x00, 0x7F, 0x04, 0x0A, 0x11}, /*"k", 107(ASCII)*/
+        {0x00, 0x41, 0x7F, 0x01, 0x00}, /*"l", 108(ASCII)*/
+        {0x1F, 0x10, 0x0F, 0x10, 0x0F}, /*"m", 109(ASCII)*/
+        {0x1F, 0x08, 0x10, 0x10, 0x0F}, /*"n", 110(ASCII)*/
+        {0x0E, 0x11, 0x11, 0x11, 0x0E}, /*"o", 111(ASCII)*/
+        {0x1F, 0x12, 0x12, 0x12, 0x0C}, /*"p", 112(ASCII)*/
+        {0x0C, 0x12, 0x12, 0x12, 0x1F}, /*"q", 113(ASCII)*/
+        {0x00, 0x1F, 0x08, 0x10, 0x10}, /*"r", 114(ASCII)*/
+        {0x09, 0x15, 0x15, 0x15, 0x12}, /*"s", 115(ASCII)*/
+        {0x00, 0x10, 0x7E, 0x11, 0x11}, /*"t", 116(ASCII)*/
+        {0x1E, 0x01, 0x01, 0x02, 0x1F}, /*"u", 117(ASCII)*/
+        {0x18, 0x06, 0x01, 0x06, 0x18}, /*"v", 118(ASCII)*/
+        {0x1F, 0x02, 0x0C, 0x02, 0x1F}, /*"w", 119(ASCII)*/
+        {0x11, 0x0A, 0x04, 0x0A, 0x11}, /*"x", 120(ASCII)*/
+        {0x18, 0x05, 0x05, 0x05, 0x1E}, /*"y", 121(ASCII)*/
+        {0x11, 0x13, 0x15, 0x19, 0x11}, /*"z", 122(ASCII)*/
+        {0x00, 0x08, 0x36, 0x41, 0x00}, /*"{", 123(ASCII)*/
+        {0x00, 0x00, 0x7F, 0x00, 0x00}, /*"|", 124(ASCII)*/
+        {0x00, 0x41, 0x36, 0x08, 0x00}, /*"}", 125(ASCII)*/
+        {0x04, 0x08, 0x0C, 0x04, 0x08}, /*"~", 126(ASCII)*/
+        {0x7F, 0x7F, 0x7F, 0x7F, 0x7F},
+    };
+
+    // Hexadecimal code corresponding to each character
+    // !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz
+    const uint8_t num_hex_codes[CHAR_SIZE] = {
+        0,
+        0,    // !
+        0,    // "
+        0,    // #
+        0,    // $
+        0,    // %
+        0,    // &
+        0,    // '
+        0,    // (
+        0,    // )
+        0x61, // *
+        0,    // +
+        0,    // ,
+        0,    // -
+        0,    // .
+        0,    // /
+        0x3f, // 0
+        0x06, // 1
+        0x5b, // 2
+        0x4f, // 3
+        0x66, // 4
+        0x6d, // 5
+        0x7d, // 6
+        0x07, // 7
+        0x7f, // 8
+        0x6f, // 9
+        0,    // :
+        0,    // ;
+        0,    // <
+        0,    // =
+        0,    // >
+        0,    // ?
+        0,    // @
+        0x77, // A
+        0x7c, // B
+        0x39, // C
+        0x5e, // D
+        0x79, // E
+        0x71, // F
+        0x6f, // G
+        0x76, // H
+        0x06, // I
+        0x0e, // J
+        0x74, // K
+        0x38, // L
+        0x36, // M
+        0x54, // N
+        0x3f, // O
+        0x73, // P
+        0x67, // Q
+        0x50, // R
+        0x6d, // S
+        0x78, // T
+        0x3e, // U
+        0x3e, // V
+        0x36, // W
+        0x76, // X
+        0x6e, // Y
+        0x5b  // Z
+    };
+    typedef enum
+    {
+        Play,
+        Pause,
+        Cue,
+        Hand,
+        Acue,
+        Reloop,
+        Single,
+        Folder,
+        Mp3,
+        Wma,
+        Aac,
+        All,
+        Track,
+
+        F,
+        S,
+        Colon,
+        M,
+        Bar_9,
+        Bar_8,
+        Bar_7,
+        Bar_6,
+        Bar_5,
+        Total,
+        Remain,
+        Elapsed,
+        Bar_1,
+        Bar_2,
+        Bar_3,
+        Bar_4,
+
+        Bat_6,
+        Bat_5,
+        Bat_4,
+        Bat_3,
+        Bat_2,
+        Bat_1,
+        Bat_0,
+        Bpm,
+        Auto,
+        Usb,
+        Sd,
+        Cd,
+        Lock,
+        Key,
+
+        L1,
+        _1,
+        _2,
+        L2,
+        L3,
+        Point,
+        Max
+    } Icon_e;
+    
+    typedef enum
+    {
+        NONE = -1,
+        CLOCKWISE,
+        ANTICLOCKWISE,
+        UP2DOWN,
+        DOWN2UP,
+        LEFT2RT,
+        RT2LEFT,
+        MAX
+    } NumAni;
+
+    typedef struct
+    {
+        char current_content;
+        char last_content;
+        int animation_step;
+        NumAni animation_type;
+    } ContentData;
+
     BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
-    BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device) {}
+    BT247GN(spi_device_handle_t spi_device);
     void init();
     void test();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
-
+    void noti_show(int start, char *buf, int size, NumAni ani = LEFT2RT, int timeout = 2000);
+    void pixel_show(int start, char *buf, int size, NumAni ani  = LEFT2RT);
+    void num_show(int start, char *buf, int size, NumAni ani);
+    void pixelanimate();
+    void numberanimate();
+    void pixelhelper(int index, uint8_t *code);
+    void numhelper(int index, uint8_t code);
+    void symbolhelper(Icon_e icon, bool en);
 private:
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;
+    int64_t content_inhibit_time = 0;
+    
+    ContentData currentPixelData[PIXEL_COUNT] = {0};
+    ContentData tempPixelData[PIXEL_COUNT] = {0};
 
+    ContentData currentNumData[NUM_COUNT] = {0};
+
+    uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void write_data8(uint8_t *dat, int len);
 
 protected:
     uint8_t internal_gram[1 + 13 * 9] = {0};
+    uint8_t pixel_gram[5 * PIXEL_COUNT] = {0};
+    uint8_t num_gram[NUM_COUNT] = {0};
+    uint8_t icon_gram[ICON_COUNT] = {0};
+
     void refrash();
+    void pixel_write(int x, int y, uint8_t *code, int len);
+    void pixel_write(int x, int y, char *ascii, int len);
+    void num_write(int x, uint8_t *code, int len);
+    void num_write(int x, char *ascii, int len);
+    void icon_write(Icon_e icon, bool en);
+    void icon_write(int x, uint8_t *code, int len);
+    void dimming_write(int val);
 };
 
 #endif

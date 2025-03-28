@@ -157,8 +157,6 @@ public:
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         InitializeSubScreen();
         SetupSubUI();
-#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        init();
 #endif
     }
 
@@ -668,11 +666,65 @@ public:
         setsleep(en);
     }
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-    void SetSubSleep(bool en = true) { setsleep(en); }
+    void SetSubSleep(bool en = true)
+    {
+        setsleep(en);
+    }
 
-    void SetSubBacklight(uint8_t brightness) {}
+    void SetSubBacklight(uint8_t brightness)
+    {
+        setbrightness(brightness);
+    }
 
-    virtual void OnStateChanged() override {}
+    virtual void OnStateChanged() override
+    {
+        auto &app = Application::GetInstance();
+        auto device_state = app.GetDeviceState();
+        symbolhelper(Hand, false);
+        symbolhelper(Folder, false);
+        symbolhelper(Aac, false);
+        symbolhelper(Single, false);
+        symbolhelper(Track, false);
+        symbolhelper(Pause, false);
+        symbolhelper(Play, false);
+        symbolhelper(Cd, false);
+        switch (device_state)
+        {
+        case kDeviceStateStarting:
+            symbolhelper(Hand, true);
+            break;
+        case kDeviceStateWifiConfiguring:
+            symbolhelper(Folder, true);
+            break;
+        case kDeviceStateIdle:
+            symbolhelper(Pause, true);
+            break;
+        case kDeviceStateConnecting:
+            symbolhelper(Track, true);
+            break;
+        case kDeviceStateListening:
+            if (app.IsVoiceDetected())
+            {
+                symbolhelper(Aac, true);
+                symbolhelper(Single, true);
+            }
+            else
+            {
+                symbolhelper(Aac, true);
+            }
+            break;
+        case kDeviceStateSpeaking:
+            symbolhelper(Pause, false);
+            symbolhelper(Play, true);
+            break;
+        case kDeviceStateUpgrading:
+            symbolhelper(Cd, true);
+            break;
+        default:
+            ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
+            return;
+        }
+    }
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
     void SetSubSleep(bool en = true)
     {
@@ -1497,9 +1549,9 @@ public:
 #define V4_UP 3100
 #define V4_DOWN 2900
 
-#if ESP_DUAL_DISPLAY_V2
     virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
     {
+#if ESP_DUAL_DISPLAY_V2
         static int last_level = 0;
         int bat_v = ina3221->getBusVoltage(BAT_PW) * 1000;
         int new_level;
@@ -1547,6 +1599,7 @@ public:
             discharging = true;
         else
             discharging = false;
+
         float voltage = 0.0f, current = 0.0f;
         for (size_t i = 0; i < 3; i++)
         {
@@ -1554,11 +1607,7 @@ public:
             current = ina3221->getCurrent(i);
             ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
         }
-        return true;
-    }
 #else
-    virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override
-    {
         static int last_level = 0;
         static bool last_charging = false;
         int bat_adc_value;
@@ -1626,9 +1675,73 @@ public:
             // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
         }
         discharging = !charging;
+#endif
+
+#if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        static int64_t start_time = esp_timer_get_time() / 1000;
+        int64_t current_time = esp_timer_get_time() / 1000;
+        int64_t elapsed_time = current_time - start_time;
+
+        if (elapsed_time >= 500)
+            start_time = current_time;
+        else
+            return true;
+        static int count = 0;
+        char time_str[11];
+        snprintf(time_str, sizeof time_str, "%d", (int)(bat_v / 10));
+        display_->num_show(14, time_str, 3, BT247GN::ANTICLOCKWISE);
+        if (discharging)
+        {
+            display_->symbolhelper(BT247GN::Bat_0, false);
+            display_->symbolhelper(BT247GN::Bat_1, false);
+            display_->symbolhelper(BT247GN::Bat_2, false);
+            display_->symbolhelper(BT247GN::Bat_3, false);
+            display_->symbolhelper(BT247GN::Bat_4, false);
+            display_->symbolhelper(BT247GN::Bat_5, false);
+            display_->symbolhelper(BT247GN::Bat_6, false);
+            if (level > 0)
+                display_->symbolhelper(BT247GN::Bat_1, true);
+            if (level > 25)
+            {
+                display_->symbolhelper(BT247GN::Bat_2, true);
+                display_->symbolhelper(BT247GN::Bat_3, true);
+            }
+            if (level > 50)
+            {
+                display_->symbolhelper(BT247GN::Bat_4, true);
+                display_->symbolhelper(BT247GN::Bat_5, true);
+            }
+            if (level > 75)
+                display_->symbolhelper(BT247GN::Bat_6, true);
+            count = 0;
+        }
+        else
+        {
+            display_->symbolhelper(BT247GN::Bat_0, true);
+            display_->symbolhelper(BT247GN::Bat_1, false);
+            display_->symbolhelper(BT247GN::Bat_2, false);
+            display_->symbolhelper(BT247GN::Bat_3, false);
+            display_->symbolhelper(BT247GN::Bat_4, false);
+            display_->symbolhelper(BT247GN::Bat_5, false);
+            display_->symbolhelper(BT247GN::Bat_6, false);
+            if (count > 0)
+                display_->symbolhelper(BT247GN::Bat_1, true);
+            if (count > 1)
+                display_->symbolhelper(BT247GN::Bat_2, true);
+            if (count > 2)
+                display_->symbolhelper(BT247GN::Bat_3, true);
+            if (count > 3)
+                display_->symbolhelper(BT247GN::Bat_4, true);
+            if (count > 4)
+                display_->symbolhelper(BT247GN::Bat_5, true);
+            if (count > 5)
+                display_->symbolhelper(BT247GN::Bat_6, true);
+            count++;
+            count = count % 7;
+        }
+#endif
         return true;
     }
-#endif
 
     virtual bool CalibrateTime(struct tm *tm_info) override
     {
@@ -1655,7 +1768,7 @@ public:
 
     virtual bool TimeUpdate() override
     {
-        display_->test();
+        // display_->test();
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         static struct tm time_user;
         time_t now = time(NULL);
@@ -1678,6 +1791,16 @@ public:
         const char *weekDays[7] = {
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
         display_->content_show(0, (char *)weekDays[time_user.tm_wday % 7], 3, HNA_16MM65T::DOWN2UP);
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        static struct tm time_user;
+        time_t now = time(NULL);
+        time_user = *localtime(&now);
+        char time_str[7];
+        strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
+        display_->pixel_show(0, time_str, 6);
+        const char *weekDays[7] = {
+            "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+        display_->pixel_show(7, (char *)weekDays[time_user.tm_wday % 7], 3, BT247GN::DOWN2UP);
 #endif
         return true;
     }

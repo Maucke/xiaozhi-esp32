@@ -18,10 +18,10 @@
 #include <esp_log.h>
 #include "spectrumdisplay.h"
 
-#define CHAR_COUNT (62 + 1)
+#define CHAR_SIZE (62 + 1)
 #define FORD_WIDTH 142
 #define FORD_HEIGHT 16
-#define NUM_SIZE (9)
+#define NUM_COUNT (9)
 
 class FORD_VFD
 {
@@ -152,7 +152,7 @@ private:
     };
     // Hexadecimal code corresponding to each character
     // !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz
-    const uint8_t hex_codes[CHAR_COUNT] = {
+    const uint8_t hex_codes[CHAR_SIZE] = {
         0,
         0,    // !
         0,    // "
@@ -236,7 +236,7 @@ private:
     };
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;
-    NumberData currentData[NUM_SIZE] = {0};
+    NumberData currentData[NUM_COUNT] = {0};
 };
 
 #endif
