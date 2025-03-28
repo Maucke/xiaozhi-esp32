@@ -179,7 +179,7 @@ const uint8_t *BT247GN::find_pixel_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= ('~' + 1))
         return hex_codes[ch - ' '];
-    return 0;
+    return hex_codes[' '];
 }
 
 uint8_t BT247GN::find_num_hex_code(char ch)
@@ -495,6 +495,13 @@ void BT247GN::numhelper(int index, uint8_t code)
 void BT247GN::symbolhelper(Icon_e icon, bool en)
 {
     icon_gram[(int)icon] = en;
+}
+
+void BT247GN::time_blink()
+{
+    static bool time_mark = true;
+    time_mark = !time_mark;
+    symbolhelper(Colon, time_mark);
 }
 
 void BT247GN::refrash() // origin

@@ -278,6 +278,7 @@ public:
     void pixelhelper(int index, uint8_t *code);
     void numhelper(int index, uint8_t code);
     void symbolhelper(Icon_e icon, bool en);
+    void time_blink();
 private:
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;

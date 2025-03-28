@@ -723,8 +723,7 @@ public:
 
     void SetSubBacklight(uint8_t brightness)
     {
-        return;
-        setbrightness(brightness);
+        setbrightness(brightness * 100 / 80 + 20);
     }
 
     virtual void OnStateChanged() override
@@ -1738,9 +1737,9 @@ public:
         else
             return true;
         static int count = 0;
-        char time_str[11];
-        snprintf(time_str, sizeof time_str, "%d", (int)(bat_v / 10));
-        display_->num_show(14, time_str, 3, BT247GN::ANTICLOCKWISE);
+        char temp_str[11];
+        snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
+        display_->num_show(14, temp_str, 3, BT247GN::ANTICLOCKWISE);
         if (discharging)
         {
             display_->symbolhelper(BT247GN::Bat_0, false);
@@ -1790,6 +1789,12 @@ public:
             count++;
             count = count % 7;
         }
+        snprintf(temp_str, sizeof temp_str, "%d", (int)(GetBarometer()));
+        display_->num_show(3, temp_str, 4, BT247GN::LEFT2RT);
+
+        snprintf(temp_str, sizeof temp_str, "%d", (int)(GetTemperature() * 10));
+        display_->num_show(18, temp_str, 3, BT247GN::RT2LEFT);
+        display_->symbolhelper(BT247GN::Point, true);
 #endif
         return true;
     }
@@ -1848,10 +1853,14 @@ public:
         time_user = *localtime(&now);
         char time_str[7];
         strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
+        display_->num_show(8, time_str, 6, BT247GN::ANTICLOCKWISE);
         display_->pixel_show(0, time_str, 6);
         const char *weekDays[7] = {
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
         display_->pixel_show(7, (char *)weekDays[time_user.tm_wday % 7], 3, BT247GN::DOWN2UP);
+        display_->time_blink();
+        snprintf(time_str, sizeof(time_str), "%d", time_user.tm_wday % 7);
+        display_->num_show(17, time_str, 1, BT247GN::ANTICLOCKWISE);
 #endif
         return true;
     }
