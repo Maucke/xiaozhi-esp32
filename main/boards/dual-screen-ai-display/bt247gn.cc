@@ -75,18 +75,18 @@ BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 
 void BT247GN::init()
 {
-    for (size_t i = 0; i < PIXEL_COUNT; i++)
-    {
-        currentPixelData[i].current_content = ' ';
-        currentPixelData[i].last_content = ' ';
-        tempPixelData[i].current_content = ' ';
-        tempPixelData[i].last_content = ' ';
-    }
-    for (size_t i = 0; i < PIXEL_COUNT; i++)
-    {
-        currentNumData[i].current_content = ' ';
-        currentNumData[i].last_content = ' ';
-    }
+    // for (size_t i = 0; i < PIXEL_COUNT; i++)
+    // {
+    //     currentPixelData[i].current_content = ' ';
+    //     currentPixelData[i].last_content = ' ';
+    //     tempPixelData[i].current_content = ' ';
+    //     tempPixelData[i].last_content = ' ';
+    // }
+    // for (size_t i = 0; i < PIXEL_COUNT; i++)
+    // {
+    //     currentNumData[i].current_content = ' ';
+    //     currentNumData[i].last_content = ' ';
+    // }
 
     xTaskCreate(
         [](void *arg)
@@ -175,6 +175,22 @@ void BT247GN::num_show(int start, char *buf, int size, NumAni ani)
     }
 }
 
+const uint8_t *BT247GN::find_pixel_hex_code(char ch)
+{
+    if (ch >= ' ' && ch <= ('~' + 1))
+        return hex_codes[ch - ' '];
+    return 0;
+}
+
+uint8_t BT247GN::find_num_hex_code(char ch)
+{
+    if (ch >= ' ' && ch <= 'Z')
+        return num_hex_codes[ch - ' '];
+    else if (ch >= 'a' && ch <= 'z')
+        return num_hex_codes[ch - 'a' + 'A' - ' '];
+    return 0;
+}
+
 void BT247GN::pixelanimate()
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
@@ -206,8 +222,8 @@ void BT247GN::pixelanimate()
     {
         if (currentPixelData[i].current_content != currentPixelData[i].last_content)
         {
-            const uint8_t *before_raw_code = hex_codes[currentPixelData[i].last_content - ' '];
-            const uint8_t *raw_code = hex_codes[currentPixelData[i].current_content - ' '];
+            const uint8_t *before_raw_code = find_pixel_hex_code(currentPixelData[i].last_content);
+            const uint8_t *raw_code = find_pixel_hex_code(currentPixelData[i].current_content);
             if (currentPixelData[i].animation_type == UP2DOWN)
             {
                 for (int j = 0; j < 5; j++)
@@ -326,8 +342,8 @@ void BT247GN::numberanimate()
     {
         if (currentNumData[i].current_content != currentNumData[i].last_content)
         {
-            uint8_t before_raw_code = num_hex_codes[currentNumData[i].last_content - ' '];
-            uint8_t raw_code = num_hex_codes[currentNumData[i].current_content - ' '];
+            uint8_t before_raw_code = find_num_hex_code(currentNumData[i].last_content);
+            uint8_t raw_code = find_num_hex_code(currentNumData[i].current_content);
             uint8_t code = raw_code;
             if (currentNumData[i].animation_type == CLOCKWISE)
             {

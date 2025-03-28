@@ -275,8 +275,6 @@ public:
     void noti_show(int start, char *buf, int size, NumAni ani = LEFT2RT, int timeout = 2000);
     void pixel_show(int start, char *buf, int size, NumAni ani  = LEFT2RT);
     void num_show(int start, char *buf, int size, NumAni ani);
-    void pixelanimate();
-    void numberanimate();
     void pixelhelper(int index, uint8_t *code);
     void numhelper(int index, uint8_t code);
     void symbolhelper(Icon_e icon, bool en);
@@ -284,14 +282,17 @@ private:
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;
     int64_t content_inhibit_time = 0;
-    
     ContentData currentPixelData[PIXEL_COUNT] = {0};
     ContentData tempPixelData[PIXEL_COUNT] = {0};
-
     ContentData currentNumData[NUM_COUNT] = {0};
+    
+    void pixelanimate();
+    void numberanimate();
 
     uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void write_data8(uint8_t *dat, int len);
+    const uint8_t *find_pixel_hex_code(char ch);
+    uint8_t find_num_hex_code(char ch);
 
 protected:
     uint8_t internal_gram[1 + 13 * 9] = {0};
