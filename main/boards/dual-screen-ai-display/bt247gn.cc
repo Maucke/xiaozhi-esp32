@@ -10,7 +10,14 @@
 #include "string.h"
 
 #define TAG "BT247GN"
-
+// 0x00-0x0D 原始数据，可带最多9*13参数，地址自增
+// 0x20-0x3F 原始点阵数据，bit 4-2:x, bit 0:y 后须带5的倍数数据，地址自增
+// 0x40-0x5F 原始数字数据，bit 4-0:x，地址自增
+// 0x60 图标，byte1位置，共49个，地址自增
+// 0x80-0x9F 数字ASCII，bit 4-1:x 地址自增
+// 0xA0-0xAF 点阵ASCII，bit 4-2:x, bit 0:y ，地址自增
+// 0xB0-0xBF 命令
+// 0xB0 dimming: 0-100
 void BT247GN::write_data8(uint8_t *dat, int len)
 {
     // Create an SPI transaction structure and initialize it to zero
@@ -56,7 +63,7 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
     // Initialize the SPI device interface configuration structure
     spi_device_interface_config_t devcfg = {
         .mode = 0,                  // Set the SPI mode to 3
-        .clock_speed_hz = 12000000, // Set the clock speed to 1MHz
+        .clock_speed_hz = 1000000, // Set the clock speed to 1MHz
         .spics_io_num = cs,         // Set the chip select pin
         .queue_size = 7,
     };
@@ -75,18 +82,18 @@ BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 
 void BT247GN::init()
 {
-    // for (size_t i = 0; i < PIXEL_COUNT; i++)
-    // {
-    //     currentPixelData[i].current_content = ' ';
-    //     currentPixelData[i].last_content = ' ';
-    //     tempPixelData[i].current_content = ' ';
-    //     tempPixelData[i].last_content = ' ';
-    // }
-    // for (size_t i = 0; i < PIXEL_COUNT; i++)
-    // {
-    //     currentNumData[i].current_content = ' ';
-    //     currentNumData[i].last_content = ' ';
-    // }
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentPixelData[i].current_content = ' ';
+        currentPixelData[i].last_content = ' ';
+        tempPixelData[i].current_content = ' ';
+        tempPixelData[i].last_content = ' ';
+    }
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentNumData[i].current_content = ' ';
+        currentNumData[i].last_content = ' ';
+    }
 
     xTaskCreate(
         [](void *arg)
@@ -124,10 +131,7 @@ void BT247GN::test()
 
 void BT247GN::setbrightness(uint8_t brightness)
 {
-    dimming = brightness * 8 / 100;
-    if (dimming > 7)
-        dimming = 7;
-    // ESP_LOGI(TAG, "dimming %d", dimming);
+    dimming = brightness * 80 / 100 + 20;
 }
 
 void BT247GN::setsleep(bool en)

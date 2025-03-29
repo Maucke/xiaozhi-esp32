@@ -723,7 +723,7 @@ public:
 
     void SetSubBacklight(uint8_t brightness)
     {
-        setbrightness(brightness * 100 / 80 + 20);
+        setbrightness(brightness);
     }
 
     virtual void OnStateChanged() override
@@ -989,11 +989,15 @@ private:
             gpio_set_level(PIN_NUM_POWER_EN, 0);
         }
         i2c_bus_delete(&i2c_bus);
-        rtc_gpio_pullup_en(TOUCH_INT_NUM);
-        esp_sleep_enable_ext0_wakeup(TOUCH_INT_NUM, 0);
 #if ESP_DUAL_DISPLAY_V2
+        rtc_gpio_pullup_en(TOUCH_INT_NUM);
         rtc_gpio_pullup_en(WAKE_INT_NUM);
-        esp_sleep_enable_ext0_wakeup(WAKE_INT_NUM, 0);
+        esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+        // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
+        esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
+#else
+        rtc_gpio_pullup_en(TOUCH_INT_NUM);
+        esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
 #endif
         // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
         // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
@@ -1154,7 +1158,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 0,                      // Set the SPI mode to 1
-            .clock_speed_hz = 12000000,     // Set the clock speed to 1MHz
+            .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .queue_size = 7,
         };
