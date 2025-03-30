@@ -910,7 +910,7 @@ private:
         int battery_level;
         bool charging, discharging;
         GetBatteryLevel(battery_level, charging, discharging);
-        if (!charging)
+        if (discharging)
         {
             if (battery_level == 0)
             {
@@ -942,7 +942,7 @@ private:
         else
             display_->symbolhelper(FORD_VFD::AUX, true);
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
-        if (!charging)
+        if (discharging)
             display_->symbolhelper(HNA_16MM65T::USB2, false);
         else
             display_->symbolhelper(HNA_16MM65T::USB2, true);
@@ -1647,12 +1647,16 @@ public:
         }
         // testmpu();
         level = new_level;
-        charging = gpio_get_level(PIN_NUM_VCC_DECT);
+        // charging = gpio_get_level(PIN_NUM_VCC_DECT);
         float crt = ina3221->getCurrent(BAT_PW);
         if (crt > 0.01)
             discharging = true;
         else
             discharging = false;
+        if (crt < -0.1)
+            charging = true;
+        else
+            charging = false;
 
         float voltage = 0.0f, current = 0.0f;
         for (size_t i = 0; i < 3; i++)
@@ -1815,8 +1819,20 @@ public:
         static uint8_t last_bl = 0;
         int dimm_adc_value;
         ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, DIMM_ADC_CHANNEL, &dimm_adc_value));
-        uint8_t bl = constrain(100 - map(dimm_adc_value, 300, 2400, 0, 100), 0, 100);
+        uint8_t bl = constrain(100 - map(dimm_adc_value, 100, 3000, 0, 100), 0, 100);
 
+        // ESP_LOGI(TAG, "bl: %d", bl);
+
+#if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        char tempstr[7];
+        snprintf(tempstr, sizeof(tempstr), "%d", (bl / 10) % 10);
+        display_->num_show(17, tempstr, 1, BT247GN::ANTICLOCKWISE);
+        if (bl / 100)
+            display_->symbolhelper(BT247GN::L2, true);
+        else
+            display_->symbolhelper(BT247GN::L2, false);
+
+#endif
         if (abs(bl - last_bl) > 10)
         {
             last_bl = bl;
@@ -1864,7 +1880,6 @@ public:
         display_->pixel_show(7, (char *)weekDays[time_user.tm_wday % 7], 3, BT247GN::DOWN2UP);
         display_->time_blink();
         snprintf(time_str, sizeof(time_str), "%d", time_user.tm_wday % 7);
-        display_->num_show(17, time_str, 1, BT247GN::ANTICLOCKWISE);
 #endif
         return true;
     }

@@ -86,13 +86,16 @@ void BT247GN::init()
     {
         currentPixelData[i].current_content = ' ';
         currentPixelData[i].last_content = ' ';
+        currentPixelData[i].animation_type = LEFT2RT;
         tempPixelData[i].current_content = ' ';
         tempPixelData[i].last_content = ' ';
+        tempPixelData[i].animation_type = LEFT2RT;
     }
     for (size_t i = 0; i < PIXEL_COUNT; i++)
     {
         currentNumData[i].current_content = ' ';
         currentNumData[i].last_content = ' ';
+        currentNumData[i].animation_type = LEFT2RT;
     }
 
     xTaskCreate(
@@ -131,7 +134,7 @@ void BT247GN::test()
 
 void BT247GN::setbrightness(uint8_t brightness)
 {
-    dimming = brightness * 80 / 100 + 20;
+    dimming = brightness;
 }
 
 void BT247GN::setsleep(bool en)
