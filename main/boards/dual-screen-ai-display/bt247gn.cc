@@ -62,9 +62,9 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
 
     // Initialize the SPI device interface configuration structure
     spi_device_interface_config_t devcfg = {
-        .mode = 0,                  // Set the SPI mode to 3
+        .mode = 0,                 // Set the SPI mode to 3
         .clock_speed_hz = 1000000, // Set the clock speed to 1MHz
-        .spics_io_num = cs,         // Set the chip select pin
+        .spics_io_num = cs,        // Set the chip select pin
         .queue_size = 7,
     };
 
@@ -82,28 +82,18 @@ BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 
 void BT247GN::init()
 {
-    for (size_t i = 0; i < PIXEL_COUNT; i++)
-    {
-        currentPixelData[i].current_content = ' ';
-        currentPixelData[i].last_content = ' ';
-        currentPixelData[i].animation_type = LEFT2RT;
-        tempPixelData[i].current_content = ' ';
-        tempPixelData[i].last_content = ' ';
-        tempPixelData[i].animation_type = LEFT2RT;
-    }
-    for (size_t i = 0; i < PIXEL_COUNT; i++)
-    {
-        currentNumData[i].current_content = ' ';
-        currentNumData[i].last_content = ' ';
-        currentNumData[i].animation_type = LEFT2RT;
-    }
-
     xTaskCreate(
         [](void *arg)
         {
+            int count = 0;
             BT247GN *vfd = static_cast<BT247GN *>(arg);
             while (true)
             {
+                if (!((++count) % 12))
+                {
+                    vfd->display_buffer();
+                    vfd->scroll_buffer();
+                }
                 vfd->refrash();
                 vTaskDelay(pdMS_TO_TICKS(10));
                 vfd->pixelanimate();
@@ -145,7 +135,7 @@ void BT247GN::setsleep(bool en)
         // refrash();
     }
 }
-void BT247GN::noti_show(int start, char *buf, int size, NumAni ani, int timeout)
+void BT247GN::noti_show(int start, const char *buf, int size, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
@@ -155,7 +145,7 @@ void BT247GN::noti_show(int start, char *buf, int size, NumAni ani, int timeout)
     }
 }
 
-void BT247GN::pixel_show(int start, char *buf, int size, NumAni ani)
+void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
 {
     if (content_inhibit_time != 0)
     {
@@ -173,7 +163,7 @@ void BT247GN::pixel_show(int start, char *buf, int size, NumAni ani)
     }
 }
 
-void BT247GN::num_show(int start, char *buf, int size, NumAni ani)
+void BT247GN::num_show(int start, const char *buf, int size, NumAni ani)
 {
     for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
     {
@@ -186,7 +176,7 @@ const uint8_t *BT247GN::find_pixel_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= ('~' + 1))
         return hex_codes[ch - ' '];
-    return hex_codes[' '];
+    return hex_codes[0];
 }
 
 uint8_t BT247GN::find_num_hex_code(char ch)
@@ -511,6 +501,14 @@ void BT247GN::time_blink()
     symbolhelper(Colon, time_mark);
 }
 
+void BT247GN::set_fonttype(int index)
+{
+#if USE_MUTI_FONTS
+    ESP_LOGI(TAG, "fonttype: %d", index % 6);
+    hex_codes = hex_codes_map[index % 6];
+#endif
+}
+
 void BT247GN::refrash() // origin
 {
     static uint8_t lastdimming = 0;
@@ -524,7 +522,7 @@ void BT247GN::refrash() // origin
     icon_write(0, icon_gram, sizeof icon_gram);
 }
 
-void BT247GN::pixel_write(int x, int y, uint8_t *code, int len)
+void BT247GN::pixel_write(int x, int y, const uint8_t *code, int len)
 {
     uint8_t temp_gram[PIXEL_COUNT * 5 + 1];
     temp_gram[0] = 0x20;
@@ -534,7 +532,7 @@ void BT247GN::pixel_write(int x, int y, uint8_t *code, int len)
     write_data8(temp_gram, len * 5 + 1);
 }
 
-void BT247GN::pixel_write(int x, int y, char *ascii, int len)
+void BT247GN::pixel_write(int x, int y, const char *ascii, int len)
 {
     uint8_t temp_gram[PIXEL_COUNT + 1];
     temp_gram[0] = 0xA0;
@@ -544,7 +542,7 @@ void BT247GN::pixel_write(int x, int y, char *ascii, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::num_write(int x, uint8_t *code, int len)
+void BT247GN::num_write(int x, const uint8_t *code, int len)
 {
     uint8_t temp_gram[NUM_COUNT + 1];
     temp_gram[0] = 0x40;
@@ -553,7 +551,7 @@ void BT247GN::num_write(int x, uint8_t *code, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::num_write(int x, char *ascii, int len)
+void BT247GN::num_write(int x, const char *ascii, int len)
 {
     uint8_t temp_gram[NUM_COUNT + 1];
     temp_gram[0] = 0x80;
@@ -572,7 +570,7 @@ void BT247GN::icon_write(Icon_e icon, bool en)
     write_data8(temp_gram, 3);
 }
 
-void BT247GN::icon_write(int x, uint8_t *code, int len)
+void BT247GN::icon_write(int x, const uint8_t *code, int len)
 {
     uint8_t temp_gram[ICON_COUNT + 2];
     temp_gram[0] = 0x60;
@@ -589,4 +587,119 @@ void BT247GN::dimming_write(int val)
     temp_gram[1] = val;
 
     write_data8(temp_gram, 2);
+}
+
+void BT247GN::display_buffer()
+{
+    if (cb->length_top <= DISPLAY_SIZE)
+    {
+        pixel_show(0, cb->buffer_top, DISPLAY_SIZE, DOWN2UP);
+
+        // ESP_LOGI(TAG, "%s", cb->buffer_top);
+    }
+    else
+    {
+        // Scroll display for length > 10
+        char display[DISPLAY_SIZE + 1];
+        for (int i = 0; i < DISPLAY_SIZE; i++)
+        {
+            int pos = (cb->start_pos_top + i) % cb->length_top;
+            display[i] = cb->buffer_top[pos];
+        }
+        pixel_show(0, display, DISPLAY_SIZE, LEFT2RT);
+
+        // ESP_LOGI(TAG, "%s", display);
+    }
+
+    if (cb->length_bottom <= DISPLAY_SIZE)
+    {
+        pixel_show(10, cb->buffer_bottom, DISPLAY_SIZE, DOWN2UP);
+
+        // ESP_LOGI(TAG, "%s", cb->buffer_bottom);
+    }
+    else
+    {
+        // Scroll display for length > 10
+        char display[DISPLAY_SIZE + 1];
+        for (int i = 0; i < DISPLAY_SIZE; i++)
+        {
+            int pos = (cb->start_pos_bottom + i) % cb->length_bottom;
+            display[i] = cb->buffer_bottom[pos];
+        }
+        pixel_show(10, display, DISPLAY_SIZE, LEFT2RT);
+
+        // ESP_LOGI(TAG, "%s", display);
+    }
+}
+void BT247GN::scroll_buffer()
+{
+    if (cb->length_top > DISPLAY_SIZE)
+    {
+        cb->start_pos_top = (cb->start_pos_top + 1) % cb->length_top;
+    }
+    if (cb->length_bottom > DISPLAY_SIZE)
+    {
+        cb->start_pos_bottom = (cb->start_pos_bottom + 1) % cb->length_bottom;
+    }
+}
+
+void BT247GN::pixel_show(int y, const char *str)
+{
+    int str_len = strlen(str);
+    if (str_len > BUFFER_SIZE)
+    {
+        // Only keep the last BUFFER_SIZE characters if input is too long
+        str += (str_len - BUFFER_SIZE);
+        str_len = BUFFER_SIZE;
+    }
+    if (y == 0)
+    {
+        memset(cb->buffer_top, 0, BUFFER_SIZE);
+        cb->length_top = 0;
+        if (str_len + cb->length_top <= BUFFER_SIZE)
+        {
+            // Simple append
+            strncpy(cb->buffer_top + cb->length_top, str, str_len);
+            cb->length_top += str_len;
+            if (str_len > DISPLAY_SIZE)
+            {
+                memset(cb->buffer_top + cb->length_top, ' ', 2);
+                cb->length_top += 2;
+            }
+        }
+        else
+        {
+            // Need to wrap around
+            int remaining = BUFFER_SIZE - cb->length_top;
+            strncpy(cb->buffer_top + cb->length_top, str, remaining);
+            strncpy(cb->buffer_top, str + remaining, str_len - remaining);
+            cb->length_top = BUFFER_SIZE;
+            cb->buffer_top[cb->length_top] = '\0';
+        }
+    }
+    else
+    {
+        memset(cb->buffer_bottom, 0, BUFFER_SIZE);
+        cb->length_bottom = 0;
+        if (str_len + cb->length_bottom <= BUFFER_SIZE)
+        {
+            // Simple append
+            strncpy(cb->buffer_bottom + cb->length_bottom, str, str_len);
+            cb->length_bottom += str_len;
+            if (str_len > DISPLAY_SIZE)
+            {
+                memset(cb->buffer_bottom + cb->length_bottom, ' ', 2);
+                cb->length_bottom += 2;
+            }
+        }
+        else
+        {
+            // Need to wrap around
+            int remaining = BUFFER_SIZE - cb->length_bottom;
+            strncpy(cb->buffer_bottom + cb->length_bottom, str, remaining);
+            strncpy(cb->buffer_bottom, str + remaining, str_len - remaining);
+            cb->length_bottom = BUFFER_SIZE;
+        }
+        cb->buffer_bottom[cb->length_bottom] = '\0';
+    }
 }

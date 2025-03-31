@@ -375,6 +375,8 @@ public:
             return;
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         SetSubContent(content);
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        SetSubContent(role, content);
 #endif
         // std::stringstream ss;
         // ss << "role: " << role << ", content: " << content << std::endl;
@@ -539,7 +541,7 @@ public:
         LV_LOG_INFO("Subscreen initialized successfully");
     }
 
-    void SetSubContent(const std::string &content)
+    void SetSubContent(const char *content)
     {
         DisplayLockGuard lock(this);
         // lv_anim_t *anim;
@@ -552,7 +554,7 @@ public:
         // lv_anim_set_exec_cb(anim, (lv_anim_exec_xcb_t)set_width);
         // lv_anim_start(anim);
 
-        lv_label_set_text(sub_status_label_, content.c_str());
+        lv_label_set_text(sub_status_label_, content);
     }
 
     void SetupSubUI()
@@ -667,6 +669,31 @@ public:
     }
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
 
+    bool isPureEnglish(const char *content)
+    {
+        int len = strlen(content);
+        for (int i = 0; i < len; i++)
+        {
+            if (!(content[i] >= ' ' && content[i] <= 'z'))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    void SetSubContent(const char *role, const char *content)
+    {
+        if (!isPureEnglish(content))
+            return;
+        if (strcmp(role, "user") == 0)
+        {
+            pixel_show(1, content);
+        }
+        else
+        {
+            pixel_show(0, content);
+        }
+    }
 #if CONFIG_USE_FFT_EFFECT
     virtual void SpectrumShow(float *buf, int size) override
     {
@@ -750,13 +777,13 @@ public:
             symbolhelper(Pause, true);
             break;
         case kDeviceStateConnecting:
-            symbolhelper(Track, true);
+            symbolhelper(Single, true);
             break;
         case kDeviceStateListening:
             if (app.IsVoiceDetected())
             {
                 symbolhelper(Aac, true);
-                symbolhelper(Single, true);
+                symbolhelper(Track, true);
             }
             else
             {
@@ -1082,6 +1109,11 @@ private:
                                    {
                                     ESP_LOGI(TAG, "Button long pressed, Deep sleep");
                                      Sleep(); });
+        touch_button_->OnClick([this]
+                               {
+                                static int fonttype = 0; 
+                                fonttype++;
+                                display_->set_fonttype(fonttype); });
 
         // touch_button_.OnPressDown([this]()
         //                           { Application::GetInstance().StartListening(); });
@@ -1450,6 +1482,7 @@ public:
         GetWakeupCause();
         GetSdcard();
         InitializeButtons();
+        display_->pixel_show(1, "Test long text present 0123456789");
 #if ESP_DUAL_DISPLAY_V2
         gpio_set_direction(PIN_NUM_VCC_DECT, GPIO_MODE_INPUT);
         gpio_set_pull_mode(PIN_NUM_VCC_DECT, GPIO_FLOATING);
@@ -1472,7 +1505,6 @@ public:
         float pressure = 0.0f;
         if (ESP_OK == bmp280_read_pressure(bmp280, &pressure))
         {
-            ESP_LOGI(TAG, "pressure:%f ", pressure);
             return pressure;
         }
         return 0;
@@ -1483,7 +1515,6 @@ public:
         float temperature = 0.0f;
         if (ESP_OK == bmp280_read_temperature(bmp280, &temperature))
         {
-            ESP_LOGI(TAG, "temperature:%f ", temperature);
             return temperature;
         }
         return 0;
@@ -1492,8 +1523,8 @@ public:
     virtual AudioCodec *GetAudioCodec() override
     {
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
-        ***static NoAudioCodec audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-                                           AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
+        static NoAudioCodec audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+                                        AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
 #else
         static NoAudioCodecDuplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
                                               AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN);
@@ -1748,6 +1779,11 @@ public:
         char temp_str[11];
         snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
         display_->num_show(14, temp_str, 3, BT247GN::ANTICLOCKWISE);
+        if (charging)
+            display_->symbolhelper(BT247GN::Usb, true);
+        else
+            display_->symbolhelper(BT247GN::Usb, false);
+
         if (discharging)
         {
             display_->symbolhelper(BT247GN::Bat_0, false);
@@ -1797,11 +1833,11 @@ public:
             count++;
             count = count % 7;
         }
-        snprintf(temp_str, sizeof temp_str, "%d", (int)(GetBarometer()));
-        display_->num_show(3, temp_str, 4, BT247GN::LEFT2RT);
+        snprintf(temp_str, sizeof temp_str, "%4d", (int)(GetBarometer()));
+        display_->num_show(3, temp_str, 4, BT247GN::ANTICLOCKWISE);
 
-        snprintf(temp_str, sizeof temp_str, "%d", (int)(GetTemperature() * 10));
-        display_->num_show(18, temp_str, 3, BT247GN::RT2LEFT);
+        snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
+        display_->num_show(18, temp_str, 3, BT247GN::CLOCKWISE);
         display_->symbolhelper(BT247GN::Point, true);
 #endif
         return true;
@@ -1874,12 +1910,10 @@ public:
         char time_str[7];
         strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
         display_->num_show(8, time_str, 6, BT247GN::ANTICLOCKWISE);
-        display_->pixel_show(0, time_str, 6);
         const char *weekDays[7] = {
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-        display_->pixel_show(7, (char *)weekDays[time_user.tm_wday % 7], 3, BT247GN::DOWN2UP);
+        display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, BT247GN::UP2DOWN);
         display_->time_blink();
-        snprintf(time_str, sizeof(time_str), "%d", time_user.tm_wday % 7);
 #endif
         return true;
     }

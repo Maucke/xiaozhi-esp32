@@ -347,3 +347,7 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
     //     6,
     //     nullptr);
 }
+
+void BOE_48_1504FN::charhelper(int index, char ch)
+{
+}
