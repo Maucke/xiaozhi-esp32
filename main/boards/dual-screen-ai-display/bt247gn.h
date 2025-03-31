@@ -789,7 +789,7 @@ public:
         NumAni animation_type;
     } ContentData;
 
-#define BUFFER_SIZE 64
+#define BUFFER_SIZE 256
 #define DISPLAY_SIZE 10
 
     typedef struct

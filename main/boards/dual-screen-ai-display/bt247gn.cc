@@ -628,7 +628,7 @@ void BT247GN::display_buffer()
         }
         pixel_show(10, display, DISPLAY_SIZE, LEFT2RT);
 
-        // ESP_LOGI(TAG, "%s", display);
+        ESP_LOGI(TAG, "%s", display);
     }
 }
 void BT247GN::scroll_buffer()
@@ -654,7 +654,7 @@ void BT247GN::pixel_show(int y, const char *str)
     }
     if (y == 0)
     {
-        memset(cb->buffer_top, 0, BUFFER_SIZE);
+        memset(cb->buffer_top, 0, sizeof cb->buffer_top);
         cb->length_top = 0;
         if (str_len + cb->length_top <= BUFFER_SIZE)
         {
@@ -674,12 +674,12 @@ void BT247GN::pixel_show(int y, const char *str)
             strncpy(cb->buffer_top + cb->length_top, str, remaining);
             strncpy(cb->buffer_top, str + remaining, str_len - remaining);
             cb->length_top = BUFFER_SIZE;
-            cb->buffer_top[cb->length_top] = '\0';
+            // cb->buffer_top[cb->length_top] = '\0';
         }
     }
     else
     {
-        memset(cb->buffer_bottom, 0, BUFFER_SIZE);
+        memset(cb->buffer_bottom, 0, sizeof cb->buffer_bottom);
         cb->length_bottom = 0;
         if (str_len + cb->length_bottom <= BUFFER_SIZE)
         {
@@ -699,7 +699,7 @@ void BT247GN::pixel_show(int y, const char *str)
             strncpy(cb->buffer_bottom + cb->length_bottom, str, remaining);
             strncpy(cb->buffer_bottom, str + remaining, str_len - remaining);
             cb->length_bottom = BUFFER_SIZE;
-            cb->buffer_bottom[cb->length_bottom] = '\0';
+            // cb->buffer_bottom[cb->length_bottom] = '\0';
         }
     }
 }
