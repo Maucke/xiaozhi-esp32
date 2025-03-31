@@ -324,28 +324,24 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
         ESP_LOGE(TAG, "VFD spi is null");
         return;
     }
-    init();
-    test();
-        ESP_LOGI(TAG, "LCD BOE_48_1504FN");
-    // xTaskCreate(
-    //     [](void *arg)
-    //     {
-    //         BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
-    //         vfd->symbolhelper(LBAR_RBAR, true);
-    //         while (true)
-    //         {
-    //             vfd->refrash(vfd->gram);
-    //             vfd->contentanimate();
-    //             vfd->waveanimate();
-    //             vTaskDelay(pdMS_TO_TICKS(10));
-    //         }
-    //         vTaskDelete(NULL);
-    //     },
-    //     "vfd",
-    //     4096 - 1024,
-    //     this,
-    //     6,
-    //     nullptr);
+    ESP_LOGI(TAG, "LCD BOE_48_1504FN");
+    xTaskCreate(
+        [](void *arg)
+        {
+            BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
+            while (true)
+            {
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                vfd->init();
+                vfd->test();
+            }
+            vTaskDelete(NULL);
+        },
+        "vfd",
+        4096 - 1024,
+        this,
+        6,
+        nullptr);
 }
 
 void BOE_48_1504FN::charhelper(int index, char ch)

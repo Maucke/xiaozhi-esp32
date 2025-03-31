@@ -683,8 +683,8 @@ public:
     }
     void SetSubContent(const char *role, const char *content)
     {
-        if (!isPureEnglish(content))
-            return;
+        // if (!isPureEnglish(content))
+        //     return;
         if (strcmp(role, "user") == 0)
         {
             pixel_show(1, content);
@@ -1111,9 +1111,12 @@ private:
                                      Sleep(); });
         touch_button_->OnClick([this]
                                {
-                                static int fonttype = 0; 
-                                fonttype++;
-                                display_->set_fonttype(fonttype); });
+#if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+                                   static int fonttype = 0;
+                                   fonttype++;
+                                   display_->set_fonttype(fonttype);
+#endif
+                               });
 
         // touch_button_.OnPressDown([this]()
         //                           { Application::GetInstance().StartListening(); });
@@ -1190,7 +1193,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 0,                      // Set the SPI mode to 1
-            .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
+            .clock_speed_hz = 12000000,      // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .queue_size = 7,
         };
@@ -1208,7 +1211,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 3,                      // Set the SPI mode to 3
-            .clock_speed_hz = 1000000,      // Set the clock speed to 1MHz
+            .clock_speed_hz = 400000,      // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .flags = SPI_DEVICE_BIT_LSBFIRST,
             .queue_size = 7,
@@ -1482,7 +1485,6 @@ public:
         GetWakeupCause();
         GetSdcard();
         InitializeButtons();
-        display_->pixel_show(1, "Test long text present 0123456789");
 #if ESP_DUAL_DISPLAY_V2
         gpio_set_direction(PIN_NUM_VCC_DECT, GPIO_MODE_INPUT);
         gpio_set_pull_mode(PIN_NUM_VCC_DECT, GPIO_FLOATING);
@@ -1911,7 +1913,7 @@ public:
         strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
         display_->num_show(8, time_str, 6, BT247GN::ANTICLOCKWISE);
         const char *weekDays[7] = {
-            "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+            "sun", "mon", "tue", "wed", "thu", "fri", "sat"};
         display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, BT247GN::UP2DOWN);
         display_->time_blink();
 #endif

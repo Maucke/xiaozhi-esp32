@@ -49,7 +49,7 @@ class BT247GN
 public:
 #define PIXEL_COUNT (20)
 #define NUM_COUNT (21)
-#define ICON_COUNT (49)
+#define ICON_COUNT (50)
 #define CHAR_SIZE (95 + 1)
     //  Hexadecimal code corresponding to each character
     //  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz

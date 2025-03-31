@@ -37,7 +37,7 @@ void BT247GN::write_data8(uint8_t *dat, int len)
     spi_transaction_t *ret_trans;
     ESP_ERROR_CHECK(spi_device_get_trans_result(spi_device_, &ret_trans, portMAX_DELAY));
     assert(ret_trans == &t);
-    vTaskDelay(pdMS_TO_TICKS(10));
+    // vTaskDelay(pdMS_TO_TICKS(10));
 
     return;
 }
@@ -95,7 +95,7 @@ void BT247GN::init()
                     vfd->scroll_buffer();
                 }
                 vfd->refrash();
-                vTaskDelay(pdMS_TO_TICKS(10));
+                vTaskDelay(pdMS_TO_TICKS(30));
                 vfd->pixelanimate();
                 vfd->numberanimate();
             }
@@ -165,7 +165,7 @@ void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
 
 void BT247GN::num_show(int start, const char *buf, int size, NumAni ani)
 {
-    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    for (size_t i = 0; i < size && (start + i) < NUM_COUNT; i++)
     {
         currentNumData[start + i].animation_type = ani;
         currentNumData[start + i].current_content = buf[i];
@@ -699,7 +699,7 @@ void BT247GN::pixel_show(int y, const char *str)
             strncpy(cb->buffer_bottom + cb->length_bottom, str, remaining);
             strncpy(cb->buffer_bottom, str + remaining, str_len - remaining);
             cb->length_bottom = BUFFER_SIZE;
+            cb->buffer_bottom[cb->length_bottom] = '\0';
         }
-        cb->buffer_bottom[cb->length_bottom] = '\0';
     }
 }
