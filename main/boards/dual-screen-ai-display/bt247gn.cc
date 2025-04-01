@@ -135,24 +135,26 @@ void BT247GN::setsleep(bool en)
         // refrash();
     }
 }
-void BT247GN::noti_show(int start, const char *buf, int size, NumAni ani, int timeout)
+void BT247GN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     for (size_t i = 0; i < PIXEL_COUNT; i++)
     {
         currentPixelData[i].animation_type = ani;
         currentPixelData[i].current_content = ' ';
-        currentPixelData[i].need_update = true;
+        if (forceupdate)
+            currentPixelData[start + i].need_update = true;
     }
     for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
     {
         currentPixelData[start + i].animation_type = ani;
         currentPixelData[start + i].current_content = buf[i];
-        currentPixelData[start + i].need_update = true;
+        if (forceupdate)
+            currentPixelData[start + i].need_update = true;
     }
 }
 
-void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
+void BT247GN::pixel_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
 {
     if (content_inhibit_time != 0)
     {
@@ -160,7 +162,8 @@ void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
         {
             tempPixelData[start + i].animation_type = ani;
             tempPixelData[start + i].current_content = buf[i];
-            tempPixelData[start + i].need_update = true;
+            if (forceupdate)
+                tempPixelData[start + i].need_update = true;
         }
         return;
     }
@@ -168,17 +171,19 @@ void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
     {
         currentPixelData[start + i].animation_type = ani;
         currentPixelData[start + i].current_content = buf[i];
-        currentPixelData[start + i].need_update = true;
+        if (forceupdate)
+            currentPixelData[start + i].need_update = true;
     }
 }
 
-void BT247GN::num_show(int start, const char *buf, int size, NumAni ani)
+void BT247GN::num_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
 {
     for (size_t i = 0; i < size && (start + i) < NUM_COUNT; i++)
     {
         currentNumData[start + i].animation_type = ani;
         currentNumData[start + i].current_content = buf[i];
-        currentNumData[start + i].need_update = true;
+        if (forceupdate)
+            currentNumData[start + i].need_update = true;
     }
 }
 
@@ -230,7 +235,6 @@ void BT247GN::pixelanimate()
     {
         if (currentPixelData[i].current_content != currentPixelData[i].last_content || currentPixelData[i].need_update)
         {
-            currentPixelData[i].need_update = false;
             const uint8_t *before_raw_code = find_pixel_hex_code(currentPixelData[i].last_content);
             const uint8_t *raw_code = find_pixel_hex_code(currentPixelData[i].current_content);
             if (currentPixelData[i].animation_type == UP2DOWN)
@@ -320,6 +324,7 @@ void BT247GN::pixelanimate()
 
             if (currentPixelData[i].animation_step == -1)
             {
+                currentPixelData[i].need_update = false;
                 currentPixelData[i].last_content = currentPixelData[i].current_content;
                 memcpy(temp_code, raw_code, sizeof temp_code);
             }
@@ -604,44 +609,50 @@ void BT247GN::dimming_write(int val)
 
 void BT247GN::display_buffer()
 {
-    if (cb->length_top <= DISPLAY_SIZE)
+    if (cb->length_top)
     {
-        pixel_show(0, cb->buffer_top, DISPLAY_SIZE, DOWN2UP);
-
-        // ESP_LOGI(TAG, "%s", cb->buffer_top);
-    }
-    else
-    {
-        // Scroll display for length > 10
-        char display[DISPLAY_SIZE + 1];
-        for (int i = 0; i < DISPLAY_SIZE; i++)
+        if (cb->length_top <= DISPLAY_SIZE)
         {
-            int pos = (cb->start_pos_top + i) % cb->length_top;
-            display[i] = cb->buffer_top[pos];
+            pixel_show(0, cb->buffer_top, DISPLAY_SIZE, false, DOWN2UP);
+
+            // ESP_LOGI(TAG, "%s", cb->buffer_top);
         }
-        pixel_show(0, display, DISPLAY_SIZE, LEFT2RT);
-
-        // ESP_LOGI(TAG, "%s", display);
-    }
-
-    if (cb->length_bottom <= DISPLAY_SIZE)
-    {
-        pixel_show(10, cb->buffer_bottom, DISPLAY_SIZE, DOWN2UP);
-
-        // ESP_LOGI(TAG, "%s", cb->buffer_bottom);
-    }
-    else
-    {
-        // Scroll display for length > 10
-        char display[DISPLAY_SIZE + 1];
-        for (int i = 0; i < DISPLAY_SIZE; i++)
+        else
         {
-            int pos = (cb->start_pos_bottom + i) % cb->length_bottom;
-            display[i] = cb->buffer_bottom[pos];
-        }
-        pixel_show(10, display, DISPLAY_SIZE, LEFT2RT);
+            // Scroll display for length > 10
+            char display[DISPLAY_SIZE + 1];
+            for (int i = 0; i < DISPLAY_SIZE; i++)
+            {
+                int pos = (cb->start_pos_top + i) % cb->length_top;
+                display[i] = cb->buffer_top[pos];
+            }
+            pixel_show(0, display, DISPLAY_SIZE, true, LEFT2RT);
 
-        ESP_LOGI(TAG, "%s", display);
+            // ESP_LOGI(TAG, "%s", display);
+        }
+    }
+
+    if (cb->length_bottom)
+    {
+        if (cb->length_bottom <= DISPLAY_SIZE)
+        {
+            pixel_show(10, cb->buffer_bottom, DISPLAY_SIZE, false, DOWN2UP);
+
+            // ESP_LOGI(TAG, "%s", cb->buffer_bottom);
+        }
+        else
+        {
+            // Scroll display for length > 10
+            char display[DISPLAY_SIZE + 1];
+            for (int i = 0; i < DISPLAY_SIZE; i++)
+            {
+                int pos = (cb->start_pos_bottom + i) % cb->length_bottom;
+                display[i] = cb->buffer_bottom[pos];
+            }
+            pixel_show(10, display, DISPLAY_SIZE, true, LEFT2RT);
+
+            ESP_LOGI(TAG, "%s", display);
+        }
     }
 }
 void BT247GN::scroll_buffer()

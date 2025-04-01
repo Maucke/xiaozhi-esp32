@@ -71,28 +71,30 @@ PT6302::PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t 
 
 void PT6302::init()
 {
-    setmode(PT6302::Mode::NORMAL);
-    setgrnum(digits);
-    dimming = 7;
-    setdimming();
+    write_mode(PT6302::Mode::NORMAL);
+    const uint8_t values[5] = {
+        0, 1, 2, 3, 4};
+    write_dcram(10, (uint8_t *)values, 5);
+    write_grnum(digits);
+    write_dimming();
 }
 
 void PT6302::test()
 {
     for (size_t i = 0; i < 10; i++)
     {
-        internal_gram[i] = i + '0';
+        internal_gram.number[i] = i + '0';
     }
-    for (size_t i = 10; i < 25; i++)
+    for (size_t i = 0; i < 15; i++)
     {
-        internal_gram[i] = 0xff;
+        internal_gram.symbol[i] = 0xff;
     }
-    for (size_t i = 25; i < 25 + 25; i++)
+    for (size_t i = 0; i < 25; i++)
     {
-        internal_gram[i] = 0x55;
+        internal_gram.cgram[i] = 0x55;
     }
 
-    refrash(internal_gram);
+    refrash(&internal_gram);
 }
 
 void PT6302::write_dcram(int index, uint8_t *dat, int len)
@@ -122,21 +124,21 @@ void PT6302::write_adram(int index, uint8_t *dat, int len)
     delete[] command;
 }
 
-void PT6302::setdimming()
+void PT6302::write_dimming()
 {
     uint8_t command = 0x50;
     command |= dimming & 0x7;
     write_data8(&command, 1);
 }
 
-void PT6302::setgrnum(unsigned int amount)
+void PT6302::write_grnum(unsigned int amount)
 {
     uint8_t command = 0x60;
     command |= amount & 0x7;
     write_data8(&command, 1);
 }
 
-void PT6302::setmode(Mode mode)
+void PT6302::write_mode(Mode mode)
 {
     uint8_t command = 0x70 | (uint8_t)mode;
     write_data8(&command, 1);
@@ -147,25 +149,22 @@ void PT6302::refrash(Gram *gram)
 {
     if (gram == nullptr)
         return;
-    write_cgram(0, gram->cgram, 25);
-    write_dcram(0, gram->number, 10);
-    const uint8_t values[5] = {
-        0, 1, 2, 3, 4};
-    write_dcram(10, (uint8_t *)values, 5);
-    write_adram(0, gram->symbol, 15);
-    setdimming();
+    write_cgram(0, gram->cgram, sizeof gram->cgram);
+    write_dcram(0, gram->number, sizeof gram->number);
+    write_adram(0, gram->symbol, sizeof gram->symbol);
+    write_dimming();
 }
 
-void PT6302::refrash(uint8_t *gram)
+void PT6302::refrash()
 {
-    refrash((Gram *)gram);
+    refrash((Gram *)&internal_gram);
 }
 
 void PT6302::setsleep(bool en)
 {
     if (en)
     {
-        memset(internal_gram, 0, sizeof internal_gram);
+        memset(internal_gram.array, 0, sizeof internal_gram.array);
     }
 }
 

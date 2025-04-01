@@ -809,9 +809,9 @@ public:
     void test();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
-    void noti_show(int start, const char *buf, int size, NumAni ani = LEFT2RT, int timeout = 2000);
+    void noti_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT, int timeout = 2000);
     void pixel_show(int y, const char *str);
-    void num_show(int start, const char *buf, int size, NumAni ani);
+    void num_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = ANTICLOCKWISE);
     void pixelhelper(int index, uint8_t *code);
     void numhelper(int index, uint8_t code);
     void symbolhelper(Icon_e icon, bool en);
@@ -858,7 +858,7 @@ protected:
     void dimming_write(int val);
     void display_buffer();
     void scroll_buffer();
-    void pixel_show(int start, const char *buf, int size, NumAni ani = LEFT2RT);
+    void pixel_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT);
 };
 
 #endif

@@ -19,6 +19,8 @@
  */
 class PT6302
 {
+#define CGRAM_SIZE 8
+#define SYMBOL_CGRAM_SIZE 5
 public:
     enum class Mode
     {
@@ -33,9 +35,10 @@ public:
         {
             uint8_t number[10];
             uint8_t symbol[15];
-            uint8_t cgram[5 * 5];
+            uint8_t cgram[SYMBOL_CGRAM_SIZE * 5];
+            uint8_t cgram_number[(CGRAM_SIZE - SYMBOL_CGRAM_SIZE) * 5];
         };
-        uint8_t array[10 + 15 + 5 * 5];
+        uint8_t array[10 + 15 + 5 * CGRAM_SIZE];
     } Gram;
 
     PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
@@ -46,7 +49,7 @@ public:
     void test();
 
 private:
-    uint8_t dimming = 0;
+    uint8_t dimming = 7;
     spi_device_handle_t spi_device_;
     const unsigned int digits = 15;
 
@@ -54,14 +57,14 @@ private:
     void write_dcram(int index, uint8_t *dat, int len);
     void write_adram(int index, uint8_t *dat, int len);
     void write_cgram(int index, uint8_t *dat, int len = 5);
-    void setdimming();
-    void setgrnum(unsigned int amount = 15);
-    void setmode(PT6302::Mode mode);
+    void write_dimming();
+    void write_grnum(unsigned int amount = 15);
+    void write_mode(PT6302::Mode mode);
 
 protected:
-    uint8_t internal_gram[10 + 15 + 5 * 5] = {0}; // Display buffer 10 num + 15 ad + 5 cgram
+    Gram internal_gram; // Display buffer 10 num + 15 ad + 5 cgram
     void refrash(Gram *gram);
-    void refrash(uint8_t *gram);
+    void refrash();
 };
 
 #endif

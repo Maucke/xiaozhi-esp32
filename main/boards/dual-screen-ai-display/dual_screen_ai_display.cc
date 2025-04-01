@@ -693,7 +693,7 @@ public:
 public:
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show(10, (char *)content.c_str(), 10, BT247GN::UP2DOWN, timeout);
+        noti_show(0, (char *)content.c_str(), content.size(), true, BT247GN::UP2DOWN, timeout);
     }
 
     void SetSubSleep(bool en = true)
@@ -950,6 +950,8 @@ private:
         mpu6050_enable_motiondetection(mpu6050, 1, 20);
         mpu6050_getMotionInterruptStatus(mpu6050, &active);
         // mpu6050_sleep(mpu6050);
+        GetBacklight()->SetBrightness(0);
+        display_->SetSubBacklight(0);
         display_->SetSleep(true);
         vTaskDelay(pdMS_TO_TICKS(100));
         if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
@@ -1059,23 +1061,23 @@ private:
         //         ResetWifiConfiguration();
         //     }
         //     app.ToggleChatState(); });
-        touch_button_->OnLongPress([this]
-                                   {
-                                    ESP_LOGI(TAG, "Button long pressed, Deep sleep");
-                                     Sleep(); });
-        touch_button_->OnClick([this]
-                               {
-#if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-                                   static int fonttype = 0;
-                                   fonttype++;
-                                   display_->set_fonttype(fonttype);
-#endif
-                               });
+        //         touch_button_->OnLongPress([this]
+        //                                    {
+        //                                     ESP_LOGI(TAG, "Button long pressed, Deep sleep");
+        //                                      Sleep(); });
+        //         touch_button_->OnClick([this]
+        //                                {
+        // #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        //                                    static int fonttype = 0;
+        //                                    fonttype++;
+        //                                    display_->set_fonttype(fonttype);
+        // #endif
+        //                                });
 
-        // touch_button_.OnPressDown([this]()
-        //                           { Application::GetInstance().StartListening(); });
-        // touch_button_.OnPressUp([this]()
-        //                         { Application::GetInstance().StopListening(); });
+        touch_button_->OnPressDown([this]()
+                                   { Application::GetInstance().StartListening(); });
+        touch_button_->OnPressUp([this]()
+                                 { Application::GetInstance().StopListening(); });
     }
 
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
@@ -1493,7 +1495,8 @@ public:
         return display_;
     }
 
-    virtual Backlight* GetBacklight() override {
+    virtual Backlight *GetBacklight() override
+    {
         static OledBacklight backlight(panel_io_);
         return &backlight;
     }
@@ -1865,6 +1868,14 @@ public:
         const char *weekDays[7] = {
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
         display_->content_show(0, (char *)weekDays[time_user.tm_wday % 7], 3, HNA_16MM65T::DOWN2UP);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        static struct tm time_user;
+        time_t now = time(NULL);
+        time_user = *localtime(&now);
+        char time_str[11];
+        strftime(time_str, sizeof(time_str), "%H:%M:%S", &time_user);
+        display_->content_show(0, time_str, 8, false, BOE_48_1504FN::UP2DOWN);
+
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         static struct tm time_user;
         time_t now = time(NULL);
@@ -1874,7 +1885,7 @@ public:
         display_->num_show(8, time_str, 6, BT247GN::ANTICLOCKWISE);
         const char *weekDays[7] = {
             "sun", "mon", "tue", "wed", "thu", "fri", "sat"};
-        display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, BT247GN::UP2DOWN);
+        display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, false, BT247GN::UP2DOWN);
         display_->time_blink();
 #endif
         return true;

@@ -10,270 +10,6 @@
 #define TAG "BOE_48_1504FN"
 
 /**
- * @brief Performs the wave animation process.
- *
- * Calculates the elapsed time, resets wave data if necessary, updates the current value of each wave point
- * based on the animation progress, and calls helper functions to update the display.
- * Also calculates the sum of left and right wave values and calls the core wave helper function.
- */
-void BOE_48_1504FN::waveanimate()
-{
-    int left_sum = 0, right_sum = 0;
-    int64_t current_time = esp_timer_get_time() / 1000;
-    int64_t elapsed_time = current_time - wave_start_time;
-
-    if (elapsed_time >= 220)
-    {
-        wave_start_time = current_time;
-        for (size_t i = 0; i < FFT_SIZE; i++)
-        {
-            waveData[i].last_value = waveData[i].target_value;
-            waveData[i].target_value = 0;
-            waveData[i].animation_step = 0;
-        }
-    }
-    for (int i = 0; i < FFT_SIZE; i++)
-    {
-        if (waveData[i].animation_step < wave_total_steps)
-        {
-            float progress = static_cast<float>(waveData[i].animation_step) / wave_total_steps;
-            float factor = 1 - std::exp(-3 * progress);
-            waveData[i].current_value = waveData[i].last_value + static_cast<int>((waveData[i].target_value - waveData[i].last_value) * factor);
-            wavehelper(i, waveData[i].current_value * 8 / 90);
-            waveData[i].animation_step++;
-        }
-        else
-        {
-            waveData[i].last_value = waveData[i].target_value;
-            wavehelper(i, waveData[i].target_value * 8 / 90);
-        }
-        if (i < 6)
-            left_sum += waveData[i].current_value;
-        else
-            right_sum += waveData[i].current_value;
-    }
-    corewavehelper(left_sum * 8 / 90 / 4, right_sum * 8 / 90 / 4);
-}
-
-/**
- * @brief Gets a part of the content by combining raw and previous raw data according to a mask.
- *
- * Combines the raw data and the previous raw data based on the given mask,
- * where the bits in the mask determine which parts come from the raw data and which come from the previous raw data.
- *
- * @param raw The current raw data.
- * @param before_raw The previous raw data.
- * @param mask The mask used to determine the combination method.
- * @return The combined data.
- */
-uint32_t BOE_48_1504FN::contentgetpart(uint32_t raw, uint32_t before_raw, uint32_t mask)
-{
-    return (raw & mask) | (before_raw & (~mask));
-}
-
-/**
- * @brief Performs the content animation process.
- *
- * Checks the elapsed time, updates the content data if the inhibition time has passed.
- * For each content item with a different current and last content,
- * it selects the appropriate animation step based on the animation type and updates the display.
- */
-void BOE_48_1504FN::contentanimate()
-{
-    static int64_t start_time = esp_timer_get_time() / 1000;
-    int64_t current_time = esp_timer_get_time() / 1000;
-    int64_t elapsed_time = current_time - start_time;
-
-    if (elapsed_time >= 30)
-        start_time = current_time;
-    else
-        return;
-
-    if (content_inhibit_time != 0)
-    {
-        elapsed_time = current_time - content_inhibit_time;
-        if (elapsed_time > 0)
-        {
-            for (size_t i = 0; i < CONTENT_SIZE; i++)
-            {
-                currentData[i].last_content = currentData[i].current_content;
-                currentData[i].animation_type = tempData[i].animation_type;
-                currentData[i].current_content = tempData[i].current_content;
-            }
-            content_inhibit_time = 0;
-        }
-    }
-
-    for (int i = 0; i < CONTENT_SIZE; i++)
-    {
-        if (currentData[i].current_content != currentData[i].last_content)
-        {
-            uint32_t before_raw_code = find_hex_code(currentData[i].last_content);
-            uint32_t raw_code = find_hex_code(currentData[i].current_content);
-            uint32_t code = raw_code;
-            if (currentData[i].animation_type == HNA_CLOCKWISE)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0x080000 | 0x800000);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0x4C0000 | 0x800000);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6e0000 | 0x800000);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6f6000 | 0x800000);
-                    break;
-                case 4:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6f6300 | 0x800000);
-                    break;
-                case 5:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6f6770 | 0x800000);
-                    break;
-                case 6:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6f6ff0 | 0x800000);
-                    break;
-                case 7:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6ffff0 | 0x800000);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else if (currentData[i].animation_type == HNA_ANTICLOCKWISE)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0x004880);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0x004ca0);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0x004ef0);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0x006ff0);
-                    break;
-                case 4:
-                    code = contentgetpart(raw_code, before_raw_code, 0x036ff0);
-                    break;
-                case 5:
-                    code = contentgetpart(raw_code, before_raw_code, 0x676ff0);
-                    break;
-                case 6:
-                    code = contentgetpart(raw_code, before_raw_code, 0xef6ff0);
-                    break;
-                case 7:
-                    code = contentgetpart(raw_code, before_raw_code, 0xffeff0);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else if (currentData[i].animation_type == HNA_UP2DOWN)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0xe00000);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0xff0000);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0xffe000);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0xffff00);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else if (currentData[i].animation_type == HNA_DOWN2UP)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0x0000f0);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0x001ff0);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0x00fff0);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0x1ffff0);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else if (currentData[i].animation_type == HNA_LEFT2RT)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0x901080);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0xd89880);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0xdcdce0);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0xdefee0);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else if (currentData[i].animation_type == HNA_RT2LEFT)
-            {
-                switch (currentData[i].animation_step)
-                {
-                case 0:
-                    code = contentgetpart(raw_code, before_raw_code, 0x210110);
-                    break;
-                case 1:
-                    code = contentgetpart(raw_code, before_raw_code, 0x632310);
-                    break;
-                case 2:
-                    code = contentgetpart(raw_code, before_raw_code, 0x676770);
-                    break;
-                case 3:
-                    code = contentgetpart(raw_code, before_raw_code, 0x6fef70);
-                    break;
-                default:
-                    currentData[i].animation_step = -1;
-                    break;
-                }
-            }
-            else
-                currentData[i].animation_step = -1;
-
-            if (currentData[i].animation_step == -1)
-                currentData[i].last_content = currentData[i].current_content;
-
-            charhelper(i, code);
-            currentData[i].animation_step++;
-        }
-    }
-}
-
-/**
  * @brief Constructor for the PT6302 class.
  *
  * Initializes the PT6302 object with the specified GPIO pins and SPI host device.
@@ -286,28 +22,30 @@ void BOE_48_1504FN::contentanimate()
 BOE_48_1504FN::BOE_48_1504FN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
 {
     init();
-    test();
-
-    ESP_LOGI(TAG, "LCD BOE_48_1504FN");
-    // xTaskCreate(
-    //     [](void *arg)
-    //     {
-    //         BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
-    //         vfd->symbolhelper(LBAR_RBAR, true);
-    //         while (true)
-    //         {
-    //             vfd->refrash(vfd->gram);
-    //             vfd->contentanimate();
-    //             vfd->waveanimate();
-    //             vTaskDelay(pdMS_TO_TICKS(10));
-    //         }
-    //         vTaskDelete(NULL);
-    //     },
-    //     "vfd",
-    //     4096 - 1024,
-    //     this,
-    //     6,
-    //     nullptr);
+    noti_show("Test long string present: 0123456789");
+    xTaskCreate(
+        [](void *arg)
+        {
+            int count = 0;
+            BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
+            while (true)
+            {
+                if (!((++count) % 12))
+                {
+                    vfd->display_buffer();
+                    vfd->scroll_buffer();
+                }
+                vfd->refrash();
+                vTaskDelay(pdMS_TO_TICKS(10));
+                vfd->contentanimate();
+            }
+            vTaskDelete(NULL);
+        },
+        "vfd",
+        4096 - 1024,
+        this,
+        6,
+        nullptr);
 }
 
 /**
@@ -324,16 +62,23 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
         ESP_LOGE(TAG, "VFD spi is null");
         return;
     }
-    ESP_LOGI(TAG, "LCD BOE_48_1504FN");
+    init();
+    noti_show("Test long string present: 0123456789");
     xTaskCreate(
         [](void *arg)
         {
+            int count = 0;
             BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
             while (true)
             {
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                vfd->init();
-                vfd->test();
+                if (!((++count) % 12))
+                {
+                    vfd->display_buffer();
+                    vfd->scroll_buffer();
+                }
+                vfd->refrash();
+                vTaskDelay(pdMS_TO_TICKS(10));
+                vfd->contentanimate();
             }
             vTaskDelete(NULL);
         },
@@ -346,4 +91,292 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
 
 void BOE_48_1504FN::charhelper(int index, char ch)
 {
+    if (index <= (DISPLAY_SIZE - 1))
+        internal_gram.number[index] = ch;
+}
+
+void BOE_48_1504FN::charhelper(int index, int ramindex, uint8_t *code)
+{
+    if (index <= (DISPLAY_SIZE - 1) && ramindex < 2)
+    {
+        for (size_t i = 0; i < 5; i++)
+            internal_gram.cgram_number[ramindex * 5 + i] = code[i];
+        internal_gram.number[index] = ramindex + SYMBOL_CGRAM_SIZE;
+    }
+}
+
+const uint8_t *BOE_48_1504FN::find_content_hex_code(char ch)
+{
+    if (ch >= ' ' && ch <= ('~' + 1))
+        return hex_codes[ch - ' '];
+    return hex_codes[0];
+}
+
+int BOE_48_1504FN::get_cgram()
+{
+    for (size_t i = 0; i < 3; i++)
+    {
+        if (!cgramBusy[i])
+        {
+            cgramBusy[i] = true;
+            return i;
+        }
+    }
+    return -1;
+}
+
+void BOE_48_1504FN::free_cgram(int index)
+{
+    if (index > 2)
+        return;
+    cgramBusy[index] = false;
+}
+
+void BOE_48_1504FN::contentanimate()
+{
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+    int64_t elapsed_time = current_time - start_time;
+    uint8_t temp_code[5] = {0};
+
+    if (elapsed_time >= 30)
+        start_time = current_time;
+    else
+        return;
+
+    if (content_inhibit_time != 0)
+    {
+        elapsed_time = current_time - content_inhibit_time;
+        if (elapsed_time > 0)
+        {
+            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            {
+                currentContentData[i].last_content = currentContentData[i].current_content;
+                currentContentData[i].animation_type = tempContentData[i].animation_type;
+                currentContentData[i].current_content = tempContentData[i].current_content;
+                currentContentData[i].need_update = true;
+            }
+            content_inhibit_time = 0;
+        }
+    }
+
+    for (int i = 0; i < DISPLAY_SIZE; i++)
+    {
+        int cgramindex = get_cgram();
+        if (cgramindex == -1)
+            return;
+        if (currentContentData[i].current_content != currentContentData[i].last_content || currentContentData[i].need_update)
+        {
+            const uint8_t *before_raw_code = find_content_hex_code(currentContentData[i].last_content);
+            const uint8_t *raw_code = find_content_hex_code(currentContentData[i].current_content);
+            if (currentContentData[i].animation_type == UP2DOWN)
+            {
+                for (int j = 0; j < 5; j++)
+                    temp_code[j] = (before_raw_code[i] << currentContentData[i].animation_step) | (raw_code[i] >> (7 - currentContentData[i].animation_step));
+
+                if (currentContentData[i].animation_step >= 7)
+                    currentContentData[i].animation_step = -1;
+            }
+            else if (currentContentData[i].animation_type == DOWN2UP)
+            {
+                for (int j = 0; j < 5; j++)
+                    temp_code[j] = (before_raw_code[i] >> currentContentData[i].animation_step) | (raw_code[i] << (7 - currentContentData[i].animation_step));
+
+                if (currentContentData[i].animation_step >= 7)
+                    currentContentData[i].animation_step = -1;
+            }
+            else if (currentContentData[i].animation_type == LEFT2RT)
+            {
+                switch (currentContentData[i].animation_step)
+                {
+                case 0:
+                    for (int j = 0; j < 4; j++)
+                        temp_code[j] = before_raw_code[j + 1];
+                    for (int j = 4; j < 5; j++)
+                        temp_code[j] = raw_code[j - 4];
+                    break;
+                case 1:
+                    for (int j = 0; j < 3; j++)
+                        temp_code[j] = before_raw_code[j + 2];
+                    for (int j = 3; j < 5; j++)
+                        temp_code[j] = raw_code[j - 3];
+                    break;
+                case 2:
+                    for (int j = 0; j < 2; j++)
+                        temp_code[j] = before_raw_code[j + 3];
+                    for (int j = 2; j < 5; j++)
+                        temp_code[j] = raw_code[j - 2];
+                    break;
+                case 3:
+                    for (int j = 0; j < 1; j++)
+                        temp_code[j] = before_raw_code[j + 4];
+                    for (int j = 1; j < 5; j++)
+                        temp_code[j] = raw_code[j - 1];
+                    break;
+                default:
+                    currentContentData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else if (currentContentData[i].animation_type == RT2LEFT)
+            {
+                switch (currentContentData[i].animation_step)
+                {
+                case 0:
+                    for (int j = 0; j < 4; j++)
+                        temp_code[j + 1] = before_raw_code[j];
+                    for (int j = 4; j < 5; j++)
+                        temp_code[j - 4] = raw_code[j];
+                    break;
+                case 1:
+                    for (int j = 0; j < 3; j++)
+                        temp_code[j + 2] = before_raw_code[j];
+                    for (int j = 3; j < 5; j++)
+                        temp_code[j - 3] = raw_code[j];
+                    break;
+                case 2:
+                    for (int j = 0; j < 2; j++)
+                        temp_code[j + 3] = before_raw_code[j];
+                    for (int j = 2; j < 5; j++)
+                        temp_code[j - 2] = raw_code[j];
+                    break;
+                case 3:
+                    for (int j = 0; j < 1; j++)
+                        temp_code[j + 4] = before_raw_code[j];
+                    for (int j = 1; j < 5; j++)
+                        temp_code[j - 1] = raw_code[j];
+                    break;
+                default:
+                    currentContentData[i].animation_step = -1;
+                    break;
+                }
+            }
+            else
+                currentContentData[i].animation_step = -1;
+
+            if (currentContentData[i].animation_step == -1)
+            {
+                currentContentData[i].need_update = false;
+                currentContentData[i].last_content = currentContentData[i].current_content;
+                memcpy(temp_code, raw_code, sizeof temp_code);
+                charhelper(i, currentContentData[i].current_content);
+                free_cgram(cgramindex);
+            }
+            else
+                charhelper(i, cgramindex, temp_code);
+
+            currentContentData[i].animation_step++;
+        }
+    }
+}
+
+void BOE_48_1504FN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
+{
+    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
+    for (size_t i = 0; i < DISPLAY_SIZE; i++)
+    {
+        currentContentData[i].animation_type = ani;
+        currentContentData[i].current_content = ' ';
+        if (forceupdate)
+            currentContentData[start + i].need_update = true;
+    }
+    for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
+    {
+        currentContentData[start + i].animation_type = ani;
+        currentContentData[start + i].current_content = buf[i];
+        if (forceupdate)
+            currentContentData[start + i].need_update = true;
+    }
+}
+
+void BOE_48_1504FN::content_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+{
+    if (content_inhibit_time != 0)
+    {
+        for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
+        {
+            tempContentData[start + i].animation_type = ani;
+            tempContentData[start + i].current_content = buf[i];
+            if (forceupdate)
+                tempContentData[start + i].need_update = true;
+        }
+        return;
+    }
+    for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
+    {
+        currentContentData[start + i].animation_type = ani;
+        currentContentData[start + i].current_content = buf[i];
+        if (forceupdate)
+            currentContentData[start + i].need_update = true;
+    }
+}
+
+void BOE_48_1504FN::display_buffer()
+{
+    if (cb->length)
+    {
+        if (cb->length <= DISPLAY_SIZE)
+        {
+            noti_show(0, cb->buffer, DISPLAY_SIZE, false, NONE, roll_timeout_);
+
+            // ESP_LOGI(TAG, "%s", cb->buffer);
+        }
+        else
+        {
+            // Scroll display for length > 10
+            char display[DISPLAY_SIZE + 1];
+            for (int i = 0; i < DISPLAY_SIZE; i++)
+            {
+                int pos = (cb->start_pos + i) % cb->length;
+                display[i] = cb->buffer[pos];
+            }
+            noti_show(0, display, DISPLAY_SIZE, false, NONE, roll_timeout_);
+
+            // ESP_LOGI(TAG, "%s", display);
+        }
+    }
+}
+void BOE_48_1504FN::scroll_buffer()
+{
+    if (cb->length > DISPLAY_SIZE)
+    {
+        cb->start_pos = (cb->start_pos + 1) % cb->length;
+    }
+}
+
+void BOE_48_1504FN::noti_show(const char *str, int timeout)
+{
+    roll_timeout_ = timeout;
+    int str_len = strlen(str);
+    if (str_len > BUFFER_SIZE)
+    {
+        // Only keep the last BUFFER_SIZE characters if input is too long
+        str += (str_len - BUFFER_SIZE);
+        str_len = BUFFER_SIZE;
+    }
+    {
+        memset(cb->buffer, 0, sizeof cb->buffer);
+        cb->start_pos = 0;
+        cb->length = 0;
+        if (str_len + cb->length <= (BUFFER_SIZE - 2))
+        {
+            // Simple append
+            strncpy(cb->buffer + cb->length, str, str_len);
+            cb->length += str_len;
+            if (str_len > DISPLAY_SIZE)
+            {
+                memset(cb->buffer + cb->length, ' ', 2);
+                cb->length += 2;
+            }
+        }
+        else
+        {
+            // Need to wrap around
+            int remaining = BUFFER_SIZE - cb->length;
+            strncpy(cb->buffer + cb->length, str, remaining);
+            strncpy(cb->buffer, str + remaining, str_len - remaining);
+            cb->length = BUFFER_SIZE;
+            cb->buffer[cb->length] = '\0';
+        }
+    }
 }
