@@ -69,11 +69,6 @@ Display *Board::GetDisplay()
     return &display;
 }
 
-Sdcard *Board::GetSdcard()
-{
-    return NULL;
-}
-
 Led* Board::GetLed() {
     static NoLed led;
     return &led;

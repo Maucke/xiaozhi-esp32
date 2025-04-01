@@ -39,6 +39,8 @@ public:
     virtual void SpectrumShow(float *buf, int size) {}
 #endif
     virtual void DrawPoint(int x, int y, uint8_t dot) {}
+    virtual std::string GetTheme() { return current_theme_name_; }
+    virtual void SetTheme(const std::string& theme_name);
 
     void SetAutoDimming(bool en)
     {
@@ -73,6 +75,7 @@ protected:
     const char *battery_icon_ = nullptr;
     const char *network_icon_ = nullptr;
     bool muted_ = false;
+    std::string current_theme_name_;
 
     esp_timer_handle_t notification_timer_ = nullptr;
     esp_timer_handle_t update_timer_ = nullptr;

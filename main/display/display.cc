@@ -17,7 +17,8 @@
 Display::Display()
 {
     // Load brightness from settings
-    Settings settings("display");
+    Settings settings("display", false);
+    current_theme_name_ = settings.GetString("theme", "light");
     brightness_ = settings.GetInt("brightness", 100);
     autoDimming_ = settings.GetInt("auto", 0);
 
@@ -312,3 +313,9 @@ void Display::Notification(const std::string &content, int timeout)
 }
 
 int Display::GetBacklight() { return 0; };
+
+void Display::SetTheme(const std::string& theme_name) {
+    current_theme_name_ = theme_name;
+    Settings settings("display", true);
+    settings.SetString("theme", theme_name);
+}

@@ -38,12 +38,12 @@ public:
     virtual ~Board() = default;
     virtual std::string GetBoardType() = 0;
     virtual std::string GetUuid() { return uuid_; }
+    virtual Backlight* GetBacklight() { return nullptr; }
     virtual Led *GetLed();
     virtual AudioCodec *GetAudioCodec() = 0;
     virtual float GetBarometer() { return 0; }
     virtual float GetTemperature() { return 0; }
     virtual Display *GetDisplay();
-    virtual Sdcard *GetSdcard();
     virtual void Sleep() {};
     virtual Http *CreateHttp() = 0;
     virtual WebSocket *CreateWebSocket() = 0;

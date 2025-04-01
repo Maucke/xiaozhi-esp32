@@ -31,8 +31,16 @@ Backlight::~Backlight() {
 
 void Backlight::RestoreBrightness() {
     // Load brightness from settings
-    Settings settings("display");
-    SetBrightness(settings.GetInt("brightness", 75));
+    Settings settings("display");  
+    int saved_brightness = settings.GetInt("brightness", 75);
+    
+    // 检查亮度值是否为0或过小，设置默认值
+    if (saved_brightness <= 0) {
+        ESP_LOGW(TAG, "Brightness value (%d) is too small, setting to default (10)", saved_brightness);
+        saved_brightness = 10;  // 设置一个较低的默认值
+    }
+    
+    SetBrightness(saved_brightness);
 }
 
 void Backlight::SetBrightness(uint8_t brightness, bool permanent) {
@@ -109,5 +117,22 @@ void PwmBacklight::SetBrightnessImpl(uint8_t brightness) {
     uint32_t duty_cycle = (1023 * brightness) / 100;
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+}
+
+
+OledBacklight::OledBacklight(esp_lcd_panel_io_handle_t panel_io) : Backlight() {
+    panel_io_ = panel_io;
+}
+
+OledBacklight::~OledBacklight() {
+}
+
+void OledBacklight::SetBrightnessImpl(uint8_t brightness) {
+    uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
+    int lcd_cmd = 0x51;
+    lcd_cmd &= 0xff;
+    lcd_cmd <<= 8;
+    lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
+    esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
 }
 

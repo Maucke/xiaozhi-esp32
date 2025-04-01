@@ -163,7 +163,7 @@ public:
         esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
     }
 
-    virtual void SetupUI() override
+    void SetupUI()
     {
         DisplayLockGuard lock(this);
 

@@ -51,7 +51,6 @@ LV_FONT_DECLARE(font_puhui_14_1);
 
 #define LCD_BIT_PER_PIXEL (16)
 
-#define LCD_OPCODE_WRITE_CMD (0x02ULL)
 #define LCD_OPCODE_READ_CMD (0x03ULL)
 #define LCD_OPCODE_WRITE_COLOR (0x32ULL)
 
@@ -148,7 +147,6 @@ public:
     {
         DisplayLockGuard lock(this);
 
-        InitializeBacklight();
         SetupUI();
         // 由于屏幕是带圆角的，所以状态栏需要增加左右内边距
         // lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.1, 0);
@@ -158,13 +156,6 @@ public:
         InitializeSubScreen();
         SetupSubUI();
 #endif
-    }
-
-    void InitializeBacklight()
-    {
-        Settings settings("display", false);
-        brightness_ = settings.GetInt("bright", 80);
-        SetBacklight(brightness_);
     }
 
     void SetSleep(bool en)
@@ -179,15 +170,11 @@ public:
         {
             data[0] = 1;
             esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-
-            SetBacklightWithoutSave(0);
         }
         else
         {
             data[0] = 0;
             esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-
-            SetBacklightWithoutSave(GetBacklight());
         }
 
 #if SUB_DISPLAY_EN
@@ -205,40 +192,6 @@ public:
         lv_obj_set_height((lv_obj_t *)var, v);
     }
 
-    virtual int GetBacklight() override { return brightness_; }
-
-    virtual void SetBacklight(uint8_t brightness) override
-    {
-        brightness_ = brightness;
-        if (brightness > 100)
-        {
-            brightness = 100;
-        }
-        Settings settings("display", true);
-        settings.SetInt("bright", brightness_);
-        SetBacklightWithoutSave(brightness_);
-    }
-
-    void SetBacklightWithoutSave(uint8_t brightness)
-    {
-        brightness_ = brightness;
-        if (brightness > 100)
-        {
-            brightness = 100;
-        }
-
-        ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness);
-        // LEDC resolution set to 10bits, thus: 100% = 255
-        uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
-        int lcd_cmd = 0x51;
-        lcd_cmd &= 0xff;
-        lcd_cmd <<= 8;
-        lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
-        esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-#if SUB_DISPLAY_EN
-        SetSubBacklight(brightness);
-#endif
-    }
     static void btn_pressed_cb(lv_event_t *e)
     {
         ESP_LOGI(TAG, "Button pressed");
@@ -252,7 +205,7 @@ public:
         Application::GetInstance().StopListening();
     }
 #define BTNWIDTH 150
-    virtual void SetupUI() override
+    void SetupUI()
     {
         DisplayLockGuard lock(this);
 
@@ -737,7 +690,7 @@ public:
             symbolhelper(Bar_10, true);
     }
 #endif
-
+public:
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
         noti_show(10, (char *)content.c_str(), 10, BT247GN::UP2DOWN, timeout);
@@ -895,6 +848,7 @@ private:
     bmp280_handle_t bmp280 = NULL;
     rx8900_handle_t rx8900 = NULL;
     mpu6050_handle_t mpu6050 = NULL;
+    esp_lcd_panel_io_handle_t panel_io_ = NULL;
 #if ESP_DUAL_DISPLAY_V2
     PCF8574 *pcf8574 = NULL;
     INA3221 *ina3221 = NULL;
@@ -1193,7 +1147,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 0,                      // Set the SPI mode to 1
-            .clock_speed_hz = 12000000,      // Set the clock speed to 1MHz
+            .clock_speed_hz = 12000000,     // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .queue_size = 7,
         };
@@ -1211,7 +1165,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 3,                      // Set the SPI mode to 3
-            .clock_speed_hz = 400000,      // Set the clock speed to 1MHz
+            .clock_speed_hz = 400000,       // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .flags = SPI_DEVICE_BIT_LSBFIRST,
             .queue_size = 7,
@@ -1268,7 +1222,7 @@ private:
             .vendor_config = &vendor_config,
         };
         ESP_ERROR_CHECK(esp_lcd_new_panel_sh8601(panel_io, &panel_config, &panel));
-
+        panel_io_ = panel_io;
         ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
         ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
         esp_lcd_panel_invert_color(panel, false);
@@ -1347,7 +1301,7 @@ private:
         auto &thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
         thing_manager.AddThing(iot::CreateThing("Barometer"));
-        thing_manager.AddThing(iot::CreateThing("Displayer"));
+        thing_manager.AddThing(iot::CreateThing("Screen"));
         thing_manager.AddThing(iot::CreateThing("Battery"));
         // thing_manager.AddThing(iot::CreateThing("Lamp"));
     }
@@ -1539,7 +1493,12 @@ public:
         return display_;
     }
 
-    virtual Sdcard *GetSdcard() override
+    virtual Backlight* GetBacklight() override {
+        static OledBacklight backlight(panel_io_);
+        return &backlight;
+    }
+
+    Sdcard *GetSdcard()
     {
         static Sdcard sd_card(PIN_NUM_SD_CMD, PIN_NUM_SD_CLK, PIN_NUM_SD_D0, PIN_NUM_SD_D1, PIN_NUM_SD_D2, PIN_NUM_SD_D3, PIN_NUM_SD_CDZ);
         return &sd_card;
@@ -1874,7 +1833,8 @@ public:
         if (abs(bl - last_bl) > 10)
         {
             last_bl = bl;
-            display_->SetBacklightWithoutSave(bl);
+            GetBacklight()->SetBrightness(bl, false);
+            display_->SetSubBacklight(bl);
         }
 
         return true;

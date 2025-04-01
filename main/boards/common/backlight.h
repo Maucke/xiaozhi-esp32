@@ -5,9 +5,10 @@
 
 #include <driver/gpio.h>
 #include <esp_timer.h>
+#include <esp_lcd_panel_io.h>
 
-
-class Backlight {
+class Backlight
+{
 public:
     Backlight();
     ~Backlight();
@@ -26,11 +27,23 @@ protected:
     uint8_t step_ = 1;
 };
 
-
-class PwmBacklight : public Backlight {
+class PwmBacklight : public Backlight
+{
 public:
     PwmBacklight(gpio_num_t pin, bool output_invert = false);
     ~PwmBacklight();
+
+    void SetBrightnessImpl(uint8_t brightness) override;
+};
+
+class OledBacklight : public Backlight
+{
+#define LCD_OPCODE_WRITE_CMD (0x02ULL)
+    esp_lcd_panel_io_handle_t panel_io_;
+
+public:
+    OledBacklight(esp_lcd_panel_io_handle_t panel_io);
+    ~OledBacklight();
 
     void SetBrightnessImpl(uint8_t brightness) override;
 };
