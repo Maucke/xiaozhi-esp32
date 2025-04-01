@@ -280,6 +280,8 @@ private:
         {24, 4},    // NUM8_POINT
     };
 
+
+    void init_task();
     /**
      * @brief Performs animation effects and updates the display buffer.
      *

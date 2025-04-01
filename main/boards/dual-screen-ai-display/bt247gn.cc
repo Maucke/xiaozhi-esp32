@@ -70,17 +70,17 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
 
     // Add the BT247GN device to the SPI bus with the specified configuration
     ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
-    init();
+    init_task();
     ESP_LOGI(TAG, "BT247GN Initalized");
 }
 
 BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 {
-    init();
+    init_task();
     ESP_LOGI(TAG, "BT247GN Initalized");
 }
 
-void BT247GN::init()
+void BT247GN::init_task()
 {
     xTaskCreate(
         [](void *arg)

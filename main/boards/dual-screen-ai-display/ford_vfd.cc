@@ -35,12 +35,14 @@ FORD_VFD::FORD_VFD(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_devic
 
 	ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
 	init();
+	init_task();
 	ESP_LOGI(TAG, "FORD_VFD Initalized");
 }
 
 FORD_VFD::FORD_VFD(spi_device_handle_t spi_device) : spi_device_(spi_device)
 {
 	init();
+	init_task();
 	ESP_LOGI(TAG, "FORD_VFD Initalized");
 }
 
@@ -274,6 +276,10 @@ void FORD_VFD::init()
 	write_data8((uint8_t *)gram, sizeof(gram));
 	write_data8((uint8_t *)init_data_block7, sizeof(init_data_block7));
 	write_data8((uint8_t *)init_data_block8, sizeof(init_data_block8));
+}
+
+void FORD_VFD::init_task()
+{
 	_spectrum = new SpectrumDisplay(FORD_WIDTH, FORD_HEIGHT);
 	_spectrum->setDrawPointCallback([this](int x, int y, uint8_t dot)
 									{ this->draw_point(x, y, dot, FFT); });

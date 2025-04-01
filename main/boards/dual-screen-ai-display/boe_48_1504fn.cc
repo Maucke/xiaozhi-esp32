@@ -22,30 +22,8 @@
 BOE_48_1504FN::BOE_48_1504FN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
 {
     init();
-    noti_show("Test long string present: 0123456789");
-    xTaskCreate(
-        [](void *arg)
-        {
-            int count = 0;
-            BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
-            while (true)
-            {
-                if (!((++count) % 12))
-                {
-                    vfd->display_buffer();
-                    vfd->scroll_buffer();
-                }
-                vfd->refrash();
-                vTaskDelay(pdMS_TO_TICKS(10));
-                vfd->contentanimate();
-            }
-            vTaskDelete(NULL);
-        },
-        "vfd",
-        4096 - 1024,
-        this,
-        6,
-        nullptr);
+    init_task();
+	ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
 }
 
 /**
@@ -63,6 +41,12 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
         return;
     }
     init();
+    init_task();
+	ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
+}
+
+void BOE_48_1504FN::init_task()
+{
     noti_show("Test long string present: 0123456789");
     xTaskCreate(
         [](void *arg)

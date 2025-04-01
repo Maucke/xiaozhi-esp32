@@ -26,61 +26,62 @@
 class FORD_VFD
 {
 public:
-typedef struct
-{
-    int byteIndex; // Byte index
-    int bitIndex;  // Bit index
-} SymbolPosition;
+    typedef struct
+    {
+        int byteIndex; // Byte index
+        int bitIndex;  // Bit index
+    } SymbolPosition;
 
-typedef enum
-{
-    IDLE = -1,
-    CONTENT,
-    FFT
-} Mode;
+    typedef enum
+    {
+        IDLE = -1,
+        CONTENT,
+        FFT
+    } Mode;
 
-typedef enum
-{
-    NONE = -1,
-    CLOCKWISE,
-    ANTICLOCKWISE,
-    UP2DOWN,
-    DOWN2UP,
-    LEFT2RT,
-    RT2LEFT,
-    MAX
-} NumAni;
+    typedef enum
+    {
+        NONE = -1,
+        CLOCKWISE,
+        ANTICLOCKWISE,
+        UP2DOWN,
+        DOWN2UP,
+        LEFT2RT,
+        RT2LEFT,
+        MAX
+    } NumAni;
 
-typedef enum
-{
-    COLON1, // 冒号1
-    COLON2, // 冒号2
-    POINT1, // 点1
-    FM,     // fm
-    AM,     // am
-    DAB,    // dab
-    NUM1,   // 1
-    NUM2,   // 2
-    TA,     // ta
-    TP,     // tp
-    BT,     // 蓝牙
-    AUX,    // 耳机
-    IPOD,   // ipod
-    UDISK,  // U盘
-    CD0,    // CD
-    CD1,    // CD
-    CD2,    // CD
-    CD3,    // CD
-    SYMBOL_MAX
-} Symbols;
+    typedef enum
+    {
+        COLON1, // 冒号1
+        COLON2, // 冒号2
+        POINT1, // 点1
+        FM,     // fm
+        AM,     // am
+        DAB,    // dab
+        NUM1,   // 1
+        NUM2,   // 2
+        TA,     // ta
+        TP,     // tp
+        BT,     // 蓝牙
+        AUX,    // 耳机
+        IPOD,   // ipod
+        UDISK,  // U盘
+        CD0,    // CD
+        CD1,    // CD
+        CD2,    // CD
+        CD3,    // CD
+        SYMBOL_MAX
+    } Symbols;
 
-typedef struct
-{
-    char current_content;
-    char last_content;
-    int animation_step;
-    NumAni animation_type;
-} NumberData;
+    typedef struct
+    {
+        char current_content;
+        char last_content;
+        int animation_step;
+        NumAni animation_type;
+    } NumberData;
+
 public:
     FORD_VFD(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
     FORD_VFD(spi_device_handle_t spi_device);
@@ -104,10 +105,6 @@ public:
     }
 
 protected:
-    SpectrumDisplay *_spectrum;
-    void contentanimate();
-    void init();
-    uint8_t get_group(int x, uint8_t dot, uint8_t group, bool isOdd);
     uint8_t find_hex_code(char ch);
     void write_data8(uint8_t dat);
     void write_data8(uint8_t *dat, int len);
@@ -237,6 +234,11 @@ private:
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;
     NumberData currentData[NUM_COUNT] = {0};
+    SpectrumDisplay *_spectrum;
+    void init();
+    void init_task();
+    void contentanimate();
+    uint8_t get_group(int x, uint8_t dot, uint8_t group, bool isOdd);
 };
 
 #endif

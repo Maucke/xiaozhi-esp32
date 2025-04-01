@@ -286,25 +286,8 @@ void HNA_16MM65T::contentanimate()
 HNA_16MM65T::HNA_16MM65T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6324(din, clk, cs, spi_num)
 {
     init();
-    xTaskCreate(
-        [](void *arg)
-        {
-            HNA_16MM65T *vfd = static_cast<HNA_16MM65T *>(arg);
-            vfd->symbolhelper(LBAR_RBAR, true);
-            while (true)
-            {
-                vfd->refrash(vfd->internal_gram);
-                vfd->contentanimate();
-                vfd->waveanimate();
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-            vTaskDelete(NULL);
-        },
-        "vfd",
-        4096 - 1024,
-        this,
-        6,
-        nullptr);
+    init_task();
+	ESP_LOGI(TAG, "HNA_16MM65T Initalized");
 }
 
 /**
@@ -322,6 +305,12 @@ HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324(spi_device)
         return;
     }
     init();
+    init_task();
+	ESP_LOGI(TAG, "HNA_16MM65T Initalized");
+}
+
+void HNA_16MM65T::init_task()
+{
     xTaskCreate(
         [](void *arg)
         {
@@ -342,7 +331,6 @@ HNA_16MM65T::HNA_16MM65T(spi_device_handle_t spi_device) : PT6324(spi_device)
         6,
         nullptr);
 }
-
 /**
  * @brief Displays spectrum information.
  *

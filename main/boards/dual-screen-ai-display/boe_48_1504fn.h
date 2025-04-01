@@ -170,16 +170,17 @@ private:
     ContentData tempContentData[DISPLAY_SIZE] = {0};
     CircularBuffer *cb = new CircularBuffer();
     int64_t content_inhibit_time = 0;
+    void init_task();
+    void contentanimate();
+    int get_cgram();
+    void free_cgram(int index);
+    void display_buffer();
+    void scroll_buffer();
+    const uint8_t *find_content_hex_code(char ch);
 
 protected:
     void charhelper(int index, char ch);                     // write to dcram
     void charhelper(int index, int ramindex, uint8_t *code); // write to cgram, then index from the dcram
-    const uint8_t *find_content_hex_code(char ch);
-    void display_buffer();
-    void scroll_buffer();
-    int get_cgram();
-    void free_cgram(int index);
-    void contentanimate();
     void noti_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT, int timeout = 2000);
 };
 

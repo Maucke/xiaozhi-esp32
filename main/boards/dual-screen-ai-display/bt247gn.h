@@ -805,7 +805,6 @@ public:
 
     BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
     BT247GN(spi_device_handle_t spi_device);
-    void init();
     void test();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
@@ -832,10 +831,18 @@ private:
     ContentData currentPixelData[PIXEL_COUNT] = {0};
     ContentData tempPixelData[PIXEL_COUNT] = {0};
     ContentData currentNumData[NUM_COUNT] = {0};
+    uint8_t internal_gram[1 + 13 * 9] = {0};
+    uint8_t pixel_gram[5 * PIXEL_COUNT] = {0};
+    uint8_t num_gram[NUM_COUNT] = {0};
+    uint8_t icon_gram[ICON_COUNT] = {0};
     CircularBuffer *cb = new CircularBuffer();
 
+    void init_task();
     void pixelanimate();
     void numberanimate();
+    void refrash();
+    void display_buffer();
+    void scroll_buffer();
 
     uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void write_data8(uint8_t *dat, int len);
@@ -843,12 +850,6 @@ private:
     uint8_t find_num_hex_code(char ch);
 
 protected:
-    uint8_t internal_gram[1 + 13 * 9] = {0};
-    uint8_t pixel_gram[5 * PIXEL_COUNT] = {0};
-    uint8_t num_gram[NUM_COUNT] = {0};
-    uint8_t icon_gram[ICON_COUNT] = {0};
-
-    void refrash();
     void pixel_write(int x, int y, const uint8_t *code, int len);
     void pixel_write(int x, int y, const char *ascii, int len);
     void num_write(int x, const uint8_t *code, int len);
@@ -856,8 +857,6 @@ protected:
     void icon_write(Icon_e icon, bool en);
     void icon_write(int x, const uint8_t *code, int len);
     void dimming_write(int val);
-    void display_buffer();
-    void scroll_buffer();
     void pixel_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT);
 };
 
