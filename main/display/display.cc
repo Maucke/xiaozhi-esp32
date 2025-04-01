@@ -51,7 +51,7 @@ Display::Display()
         .skip_unhandled_events = true,
     };
     ESP_ERROR_CHECK(esp_timer_create(&update_display_timer_args, &update_timer_));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(update_timer_, 1000000));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(update_timer_, 500000));
 
     // Create a power management lock
     auto ret = esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "display_update", &pm_lock_);

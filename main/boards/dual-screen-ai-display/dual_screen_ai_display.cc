@@ -1873,7 +1873,12 @@ public:
         time_t now = time(NULL);
         time_user = *localtime(&now);
         char time_str[11];
-        strftime(time_str, sizeof(time_str), "%H:%M:%S", &time_user);
+        static bool blink = false;
+        if (blink)
+            strftime(time_str, sizeof(time_str), "%H:%M:%S", &time_user);
+        else
+            strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
+        blink = !blink;
         display_->content_show(0, time_str, 8, false, BOE_48_1504FN::UP2DOWN);
 
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN

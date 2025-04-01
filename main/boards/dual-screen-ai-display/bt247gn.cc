@@ -235,12 +235,13 @@ void BT247GN::pixelanimate()
     {
         if (currentPixelData[i].current_content != currentPixelData[i].last_content || currentPixelData[i].need_update)
         {
+            currentPixelData[i].animation_step++;
             const uint8_t *before_raw_code = find_pixel_hex_code(currentPixelData[i].last_content);
             const uint8_t *raw_code = find_pixel_hex_code(currentPixelData[i].current_content);
             if (currentPixelData[i].animation_type == UP2DOWN)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[i] << currentPixelData[i].animation_step) | (raw_code[i] >> (7 - currentPixelData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] << currentPixelData[i].animation_step) | (raw_code[j] >> (7 - currentPixelData[i].animation_step));
 
                 if (currentPixelData[i].animation_step >= 7)
                     currentPixelData[i].animation_step = -1;
@@ -248,7 +249,7 @@ void BT247GN::pixelanimate()
             else if (currentPixelData[i].animation_type == DOWN2UP)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[i] >> currentPixelData[i].animation_step) | (raw_code[i] << (7 - currentPixelData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] >> currentPixelData[i].animation_step) | (raw_code[j] << (7 - currentPixelData[i].animation_step));
 
                 if (currentPixelData[i].animation_step >= 7)
                     currentPixelData[i].animation_step = -1;
@@ -331,7 +332,6 @@ void BT247GN::pixelanimate()
 
             pixelhelper(i, temp_code);
 
-            currentPixelData[i].animation_step++;
         }
     }
 }
@@ -651,7 +651,7 @@ void BT247GN::display_buffer()
             }
             pixel_show(10, display, DISPLAY_SIZE, true, LEFT2RT);
 
-            ESP_LOGI(TAG, "%s", display);
+            // ESP_LOGI(TAG, "%s", display);
         }
     }
 }

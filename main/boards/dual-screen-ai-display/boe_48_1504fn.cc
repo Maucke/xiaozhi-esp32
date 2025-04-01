@@ -23,7 +23,7 @@ BOE_48_1504FN::BOE_48_1504FN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_
 {
     init();
     init_task();
-	ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
+    ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
 }
 
 /**
@@ -42,19 +42,38 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
     }
     init();
     init_task();
-	ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
+    ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
 }
 
 void BOE_48_1504FN::init_task()
 {
-    noti_show("Test long string present: 0123456789");
+    // noti_show("Test long string present: 0123456789");
+    memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
+    memset(internal_gram.cgram, 0, sizeof internal_gram.cgram);
+    for (size_t i = 0; i < 10; i++)
+    {
+        charhelper(i, ' ');
+    }
+    for (int i = 0; i < DISPLAY_SIZE; i++)
+    {
+        currentContentData[i].animation_index = -1;
+        tempContentData[i].animation_index = -1;
+    }
+
     xTaskCreate(
         [](void *arg)
         {
             int count = 0;
             BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
+            char tempstr[10];
+
             while (true)
             {
+                // vfd->internal_gram.cgram[(count / 8 - 1) % 25] = 0;
+                // vfd->internal_gram.cgram[count / 8 % 25] = 1 << (count % 8);
+
+                // snprintf(tempstr, 10, "%d-%d", count / 8 % 25, count % 8);
+                // vfd->content_show(0, tempstr, 4, false, BOE_48_1504FN::NONE);
                 if (!((++count) % 12))
                 {
                     vfd->display_buffer();
@@ -81,7 +100,7 @@ void BOE_48_1504FN::charhelper(int index, char ch)
 
 void BOE_48_1504FN::charhelper(int index, int ramindex, uint8_t *code)
 {
-    if (index <= (DISPLAY_SIZE - 1) && ramindex < 2)
+    if (index <= (DISPLAY_SIZE - 1) && ramindex <= 2)
     {
         for (size_t i = 0; i < 5; i++)
             internal_gram.cgram_number[ramindex * 5 + i] = code[i];
@@ -146,27 +165,35 @@ void BOE_48_1504FN::contentanimate()
 
     for (int i = 0; i < DISPLAY_SIZE; i++)
     {
-        int cgramindex = get_cgram();
-        if (cgramindex == -1)
-            return;
+
         if (currentContentData[i].current_content != currentContentData[i].last_content || currentContentData[i].need_update)
         {
+            if (currentContentData[i].animation_index == -1)
+            {
+                currentContentData[i].animation_index = get_cgram();
+                if (currentContentData[i].animation_index == -1)
+                    return;
+            }
+            currentContentData[i].animation_step++;
             const uint8_t *before_raw_code = find_content_hex_code(currentContentData[i].last_content);
             const uint8_t *raw_code = find_content_hex_code(currentContentData[i].current_content);
+
+            // ESP_LOGI(TAG, "%c-%c", currentContentData[i].last_content, currentContentData[i].current_content);
+
             if (currentContentData[i].animation_type == UP2DOWN)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[i] << currentContentData[i].animation_step) | (raw_code[i] >> (7 - currentContentData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] << currentContentData[i].animation_step) | (raw_code[j] >> (8 - currentContentData[i].animation_step));
 
-                if (currentContentData[i].animation_step >= 7)
+                if (currentContentData[i].animation_step >= 8)
                     currentContentData[i].animation_step = -1;
             }
             else if (currentContentData[i].animation_type == DOWN2UP)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[i] >> currentContentData[i].animation_step) | (raw_code[i] << (7 - currentContentData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] >> currentContentData[i].animation_step) | (raw_code[j] << (8 - currentContentData[i].animation_step));
 
-                if (currentContentData[i].animation_step >= 7)
+                if (currentContentData[i].animation_step >= 8)
                     currentContentData[i].animation_step = -1;
             }
             else if (currentContentData[i].animation_type == LEFT2RT)
@@ -244,12 +271,13 @@ void BOE_48_1504FN::contentanimate()
                 currentContentData[i].last_content = currentContentData[i].current_content;
                 memcpy(temp_code, raw_code, sizeof temp_code);
                 charhelper(i, currentContentData[i].current_content);
-                free_cgram(cgramindex);
+                free_cgram(currentContentData[i].animation_index);
+                currentContentData[i].animation_index = -1;
             }
             else
-                charhelper(i, cgramindex, temp_code);
-
-            currentContentData[i].animation_step++;
+            {
+                charhelper(i, currentContentData[i].animation_index, temp_code);
+            }
         }
     }
 }

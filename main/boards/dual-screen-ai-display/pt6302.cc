@@ -149,7 +149,7 @@ void PT6302::refrash(Gram *gram)
 {
     if (gram == nullptr)
         return;
-    write_cgram(0, gram->cgram, sizeof gram->cgram);
+    write_cgram(0, gram->cgram, 40);
     write_dcram(0, gram->number, sizeof gram->number);
     write_adram(0, gram->symbol, sizeof gram->symbol);
     write_dimming();

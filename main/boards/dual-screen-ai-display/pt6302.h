@@ -49,7 +49,7 @@ public:
     void test();
 
 private:
-    uint8_t dimming = 7;
+    uint8_t dimming = 1;
     spi_device_handle_t spi_device_;
     const unsigned int digits = 15;
 
