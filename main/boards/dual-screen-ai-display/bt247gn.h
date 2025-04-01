@@ -11,7 +11,7 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 
-#define USE_MUTI_FONTS false
+#define USE_MUTI_FONTS true
 // uint8_t reverseBits0To6(uint8_t byte)
 // {
 //     uint8_t bit7 = byte & 0x80;
@@ -787,6 +787,7 @@ public:
         char last_content;
         int animation_step;
         NumAni animation_type;
+        bool need_update;
     } ContentData;
 
 #define BUFFER_SIZE 256

@@ -138,10 +138,17 @@ void BT247GN::setsleep(bool en)
 void BT247GN::noti_show(int start, const char *buf, int size, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentPixelData[i].animation_type = ani;
+        currentPixelData[i].current_content = ' ';
+        currentPixelData[i].need_update = true;
+    }
     for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
     {
         currentPixelData[start + i].animation_type = ani;
         currentPixelData[start + i].current_content = buf[i];
+        currentPixelData[start + i].need_update = true;
     }
 }
 
@@ -153,6 +160,7 @@ void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
         {
             tempPixelData[start + i].animation_type = ani;
             tempPixelData[start + i].current_content = buf[i];
+            tempPixelData[start + i].need_update = true;
         }
         return;
     }
@@ -160,6 +168,7 @@ void BT247GN::pixel_show(int start, const char *buf, int size, NumAni ani)
     {
         currentPixelData[start + i].animation_type = ani;
         currentPixelData[start + i].current_content = buf[i];
+        currentPixelData[start + i].need_update = true;
     }
 }
 
@@ -169,6 +178,7 @@ void BT247GN::num_show(int start, const char *buf, int size, NumAni ani)
     {
         currentNumData[start + i].animation_type = ani;
         currentNumData[start + i].current_content = buf[i];
+        currentNumData[start + i].need_update = true;
     }
 }
 
@@ -210,6 +220,7 @@ void BT247GN::pixelanimate()
                 currentPixelData[i].last_content = currentPixelData[i].current_content;
                 currentPixelData[i].animation_type = tempPixelData[i].animation_type;
                 currentPixelData[i].current_content = tempPixelData[i].current_content;
+                currentPixelData[i].need_update = true;
             }
             content_inhibit_time = 0;
         }
@@ -217,8 +228,9 @@ void BT247GN::pixelanimate()
 
     for (int i = 0; i < PIXEL_COUNT; i++)
     {
-        if (currentPixelData[i].current_content != currentPixelData[i].last_content)
+        if (currentPixelData[i].current_content != currentPixelData[i].last_content || currentPixelData[i].need_update)
         {
+            currentPixelData[i].need_update = false;
             const uint8_t *before_raw_code = find_pixel_hex_code(currentPixelData[i].last_content);
             const uint8_t *raw_code = find_pixel_hex_code(currentPixelData[i].current_content);
             if (currentPixelData[i].animation_type == UP2DOWN)
@@ -337,8 +349,9 @@ void BT247GN::numberanimate()
 
     for (int i = 0; i < NUM_COUNT; i++)
     {
-        if (currentNumData[i].current_content != currentNumData[i].last_content)
+        if (currentNumData[i].current_content != currentNumData[i].last_content || currentNumData[i].need_update)
         {
+            currentNumData[i].need_update = false;
             uint8_t before_raw_code = find_num_hex_code(currentNumData[i].last_content);
             uint8_t raw_code = find_num_hex_code(currentNumData[i].current_content);
             uint8_t code = raw_code;
@@ -655,8 +668,9 @@ void BT247GN::pixel_show(int y, const char *str)
     if (y == 0)
     {
         memset(cb->buffer_top, 0, sizeof cb->buffer_top);
+        cb->start_pos_top = 0;
         cb->length_top = 0;
-        if (str_len + cb->length_top <= BUFFER_SIZE)
+        if (str_len + cb->length_top <= (BUFFER_SIZE - 2))
         {
             // Simple append
             strncpy(cb->buffer_top + cb->length_top, str, str_len);
@@ -674,14 +688,15 @@ void BT247GN::pixel_show(int y, const char *str)
             strncpy(cb->buffer_top + cb->length_top, str, remaining);
             strncpy(cb->buffer_top, str + remaining, str_len - remaining);
             cb->length_top = BUFFER_SIZE;
-            // cb->buffer_top[cb->length_top] = '\0';
+            cb->buffer_top[cb->length_top] = '\0';
         }
     }
     else
     {
         memset(cb->buffer_bottom, 0, sizeof cb->buffer_bottom);
+        cb->start_pos_bottom = 0;
         cb->length_bottom = 0;
-        if (str_len + cb->length_bottom <= BUFFER_SIZE)
+        if (str_len + cb->length_bottom <= (BUFFER_SIZE - 2))
         {
             // Simple append
             strncpy(cb->buffer_bottom + cb->length_bottom, str, str_len);
@@ -699,7 +714,7 @@ void BT247GN::pixel_show(int y, const char *str)
             strncpy(cb->buffer_bottom + cb->length_bottom, str, remaining);
             strncpy(cb->buffer_bottom, str + remaining, str_len - remaining);
             cb->length_bottom = BUFFER_SIZE;
-            // cb->buffer_bottom[cb->length_bottom] = '\0';
+            cb->buffer_bottom[cb->length_bottom] = '\0';
         }
     }
 }
