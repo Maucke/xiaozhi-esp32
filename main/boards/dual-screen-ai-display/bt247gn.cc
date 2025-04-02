@@ -111,12 +111,12 @@ void BT247GN::init_task()
 void BT247GN::test()
 {
     static bool face = false;
-    for (size_t i = 1; i < sizeof internal_gram; i++)
+    for (size_t i = 0; i < sizeof pixel_gram; i++)
     {
         if (face)
-            internal_gram[i] = rand();
+            pixel_gram[i] = rand();
         else
-            internal_gram[i] = 0xFF;
+            pixel_gram[i] = 0xFF;
     }
     face = !face;
     refrash();
@@ -131,10 +131,12 @@ void BT247GN::setsleep(bool en)
 {
     if (en)
     {
-        memset(internal_gram, 0, sizeof internal_gram);
-        // refrash();
+        memset(pixel_gram, 0, sizeof pixel_gram);
+        memset(num_gram, 0, sizeof num_gram);
+        memset(icon_gram, 0, sizeof icon_gram);
     }
 }
+
 void BT247GN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
@@ -143,7 +145,7 @@ void BT247GN::noti_show(int start, const char *buf, int size, bool forceupdate, 
         currentPixelData[i].animation_type = ani;
         currentPixelData[i].current_content = ' ';
         if (forceupdate)
-            currentPixelData[start + i].need_update = true;
+            currentPixelData[i].need_update = true;
     }
     for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
     {
@@ -241,17 +243,17 @@ void BT247GN::pixelanimate()
             if (currentPixelData[i].animation_type == UP2DOWN)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[j] << currentPixelData[i].animation_step) | (raw_code[j] >> (7 - currentPixelData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] << currentPixelData[i].animation_step) | (raw_code[j] >> (8 - currentPixelData[i].animation_step));
 
-                if (currentPixelData[i].animation_step >= 7)
+                if (currentPixelData[i].animation_step >= 8)
                     currentPixelData[i].animation_step = -1;
             }
             else if (currentPixelData[i].animation_type == DOWN2UP)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[j] >> currentPixelData[i].animation_step) | (raw_code[j] << (7 - currentPixelData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] >> currentPixelData[i].animation_step) | (raw_code[j] << (8 - currentPixelData[i].animation_step));
 
-                if (currentPixelData[i].animation_step >= 7)
+                if (currentPixelData[i].animation_step >= 8)
                     currentPixelData[i].animation_step = -1;
             }
             else if (currentPixelData[i].animation_type == LEFT2RT)
@@ -331,7 +333,6 @@ void BT247GN::pixelanimate()
             }
 
             pixelhelper(i, temp_code);
-
         }
     }
 }
@@ -507,7 +508,7 @@ void BT247GN::numhelper(int index, uint8_t code)
     num_gram[index] = code;
 }
 
-void BT247GN::symbolhelper(Icon_e icon, bool en)
+void BT247GN::symbolhelper(Symbols icon, bool en)
 {
     icon_gram[(int)icon] = en;
 }
@@ -578,7 +579,7 @@ void BT247GN::num_write(int x, const char *ascii, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::icon_write(Icon_e icon, bool en)
+void BT247GN::icon_write(Symbols icon, bool en)
 {
     uint8_t temp_gram[1 + 2];
     temp_gram[0] = 0x60;
@@ -728,4 +729,45 @@ void BT247GN::pixel_show(int y, const char *str)
             cb->buffer_bottom[cb->length_bottom] = '\0';
         }
     }
+}
+void BT247GN::spectrum_show(float *buf, int size)
+{
+    symbolhelper(Bar_1, false);
+    symbolhelper(Bar_2, false);
+    symbolhelper(Bar_3, false);
+    symbolhelper(Bar_4, false);
+    symbolhelper(Bar_5, false);
+    symbolhelper(Bar_6, false);
+    symbolhelper(Bar_7, false);
+    symbolhelper(Bar_8, false);
+    symbolhelper(Bar_9, false);
+    symbolhelper(Bar_10, false);
+
+    int fft_level = 0;
+    for (size_t i = size / 4; i < size * 3 / 4; i++)
+    {
+        fft_level += buf[i];
+    }
+    fft_level /= (size / 2);
+
+    if (fft_level > 5)
+        symbolhelper(Bar_1, true);
+    if (fft_level > 15)
+        symbolhelper(Bar_2, true);
+    if (fft_level > 25)
+        symbolhelper(Bar_3, true);
+    if (fft_level > 35)
+        symbolhelper(Bar_4, true);
+    if (fft_level > 45)
+        symbolhelper(Bar_5, true);
+    if (fft_level > 55)
+        symbolhelper(Bar_6, true);
+    if (fft_level > 65)
+        symbolhelper(Bar_7, true);
+    if (fft_level > 75)
+        symbolhelper(Bar_8, true);
+    if (fft_level > 85)
+        symbolhelper(Bar_9, true);
+    if (fft_level > 95)
+        symbolhelper(Bar_10, true);
 }

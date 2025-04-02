@@ -29,7 +29,7 @@ public:
     typedef struct
     {
         int byteIndex; // Byte index
-        int bitIndex;  // Bit index
+        int bitMask;  // Bit index
     } SymbolPosition;
 
     typedef enum
@@ -87,7 +87,7 @@ public:
     FORD_VFD(spi_device_handle_t spi_device);
     void draw_point(int x, int y, uint8_t dot, Mode mode = CONTENT);
     void clear();
-    void find_enum_code(Symbols flag, int *byteIndex, int *bitIndex);
+    void find_enum_code(Symbols flag, int *byteIndex, int *bitMask);
     void symbolhelper(Symbols symbol, bool is_on);
 
     void charhelper(int index, char ch);

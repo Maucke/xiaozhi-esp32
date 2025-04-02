@@ -693,7 +693,8 @@ void Application::OnAudioOutput() {
 void Application::OnAudioInput() {
     std::vector<int16_t> data;
 #if CONFIG_USE_FFT_EFFECT
-    fft_dsp_processor_.Input(data);
+    ReadAudio(data, 16000, fft_dsp_processor_.GetFeedSize());
+    fft_dsp_processor_.Feed(data);
 #endif
 #if CONFIG_USE_WAKE_WORD_DETECT
     if (wake_word_detect_.IsDetectionRunning()) {

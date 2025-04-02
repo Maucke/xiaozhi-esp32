@@ -243,7 +243,7 @@ config USE_WAKE_WORD_DETECT
 config USE_FFT_EFFECT
     bool "启用频谱效果"
     default y
-    depends on IDF_TARGET_ESP32S3 && USE_AFE
+    depends on IDF_TARGET_ESP32S3 && SPIRAM
     help
         需要 ESP32 S3 与 AFE 支持
 

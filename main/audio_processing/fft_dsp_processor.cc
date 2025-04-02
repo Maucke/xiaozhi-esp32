@@ -34,11 +34,11 @@ void FFTDspProcessor::Initialize()
 {
 }
 
-FFTDspProcessor::~FFTDspProcessor()
-{
+size_t FFTDspProcessor::GetFeedSize() {
+    return audio_chunksize;
 }
 
-void FFTDspProcessor::Input(const std::vector<int16_t> &data)
+void FFTDspProcessor::Feed(const std::vector<int16_t> &data)
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
     int64_t current_time = esp_timer_get_time() / 1000;

@@ -47,7 +47,7 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
 
 void BOE_48_1504FN::init_task()
 {
-    // noti_show("Test long string present: 0123456789");
+    // noti_show("Test long string present: 0123456789", 5000);
     memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
     memset(internal_gram.cgram, 0, sizeof internal_gram.cgram);
     for (size_t i = 0; i < 10; i++)
@@ -60,6 +60,15 @@ void BOE_48_1504FN::init_task()
         tempContentData[i].animation_index = -1;
     }
 
+    symbolhelper(L_OUTLINE, true);
+    symbolhelper(R_OUTLINE, true);
+    symbolhelper(LD_LINE, true);
+    symbolhelper(RD_LINE, true);
+    symbolhelper(D_OUTLINE, true);
+    symbolhelper(L_LINE, true);
+    symbolhelper(R_LINE, true);
+
+    refrash();
     xTaskCreate(
         [](void *arg)
         {
@@ -74,11 +83,13 @@ void BOE_48_1504FN::init_task()
 
                 // snprintf(tempstr, 10, "%d-%d", count / 8 % 25, count % 8);
                 // vfd->content_show(0, tempstr, 4, false, BOE_48_1504FN::NONE);
+                // vfd->symbolhelper((Symbols)((count / 10) % SYMBOL_COUNT), false);
                 if (!((++count) % 12))
                 {
                     vfd->display_buffer();
                     vfd->scroll_buffer();
                 }
+                // vfd->symbolhelper((Symbols)((count / 10) % SYMBOL_COUNT), true);
                 vfd->refrash();
                 vTaskDelay(pdMS_TO_TICKS(10));
                 vfd->contentanimate();
@@ -155,7 +166,7 @@ void BOE_48_1504FN::contentanimate()
             for (size_t i = 0; i < DISPLAY_SIZE; i++)
             {
                 currentContentData[i].last_content = currentContentData[i].current_content;
-                currentContentData[i].animation_type = tempContentData[i].animation_type;
+                currentContentData[i].animation_type = NONE;
                 currentContentData[i].current_content = tempContentData[i].current_content;
                 currentContentData[i].need_update = true;
             }
@@ -165,9 +176,20 @@ void BOE_48_1504FN::contentanimate()
 
     for (int i = 0; i < DISPLAY_SIZE; i++)
     {
-
         if (currentContentData[i].current_content != currentContentData[i].last_content || currentContentData[i].need_update)
         {
+            if (currentContentData[i].animation_type == NONE)
+            {
+                currentContentData[i].need_update = false;
+                currentContentData[i].last_content = currentContentData[i].current_content;
+                if (currentContentData[i].current_content < 8)
+                    charhelper(i, ' ');
+                else
+                    charhelper(i, currentContentData[i].current_content);
+                currentContentData[i].animation_index = -1;
+                continue;
+            }
+
             if (currentContentData[i].animation_index == -1)
             {
                 currentContentData[i].animation_index = get_cgram();
@@ -269,8 +291,10 @@ void BOE_48_1504FN::contentanimate()
             {
                 currentContentData[i].need_update = false;
                 currentContentData[i].last_content = currentContentData[i].current_content;
-                memcpy(temp_code, raw_code, sizeof temp_code);
-                charhelper(i, currentContentData[i].current_content);
+                if (currentContentData[i].current_content < 8)
+                    charhelper(i, ' ');
+                else
+                    charhelper(i, currentContentData[i].current_content);
                 free_cgram(currentContentData[i].animation_index);
                 currentContentData[i].animation_index = -1;
             }
@@ -290,7 +314,7 @@ void BOE_48_1504FN::noti_show(int start, const char *buf, int size, bool forceup
         currentContentData[i].animation_type = ani;
         currentContentData[i].current_content = ' ';
         if (forceupdate)
-            currentContentData[start + i].need_update = true;
+            currentContentData[i].need_update = true;
     }
     for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
     {
@@ -323,14 +347,62 @@ void BOE_48_1504FN::content_show(int start, const char *buf, int size, bool forc
     }
 }
 
+void BOE_48_1504FN::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
+{
+    *byteIndex = symbolPositions[flag].byteIndex;
+    *bitMask = symbolPositions[flag].bitMask;
+}
+
+void BOE_48_1504FN::symbolhelper(Symbols symbol, bool is_on)
+{
+    if (symbol >= SYMBOL_MAX)
+        return;
+
+    int byteIndex, bitMask;
+    find_enum_code(symbol, &byteIndex, &bitMask);
+
+    if (byteIndex < 25)
+    {
+        // ESP_LOGI(TAG, "byteIndex: %d", byteIndex);
+        if (is_on)
+            internal_gram.cgram[byteIndex] |= bitMask;
+        else
+            internal_gram.cgram[byteIndex] &= ~bitMask;
+    }
+    else
+    {
+        if (is_on)
+            internal_gram.symbol[byteIndex - 25] |= bitMask;
+        else
+            internal_gram.symbol[byteIndex - 25] &= ~bitMask;
+    }
+}
+
 void BOE_48_1504FN::display_buffer()
 {
+    int64_t current_time = esp_timer_get_time() / 1000;
+    if (content_inhibit_time != 0)
+    {
+        int64_t elapsed_time = current_time - content_inhibit_time;
+        if (elapsed_time > 0)
+        {
+            memset(cb->buffer, 0, sizeof cb->buffer);
+            cb->start_pos = 0;
+            cb->length = 0;
+            content_inhibit_time = 0;
+        }
+    }
+    else
+        return;
     if (cb->length)
     {
         if (cb->length <= DISPLAY_SIZE)
         {
-            noti_show(0, cb->buffer, DISPLAY_SIZE, false, NONE, roll_timeout_);
-
+            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            {
+                currentContentData[i].animation_type = NONE;
+                currentContentData[i].current_content = cb->buffer[i];
+            }
             // ESP_LOGI(TAG, "%s", cb->buffer);
         }
         else
@@ -342,7 +414,11 @@ void BOE_48_1504FN::display_buffer()
                 int pos = (cb->start_pos + i) % cb->length;
                 display[i] = cb->buffer[pos];
             }
-            noti_show(0, display, DISPLAY_SIZE, false, NONE, roll_timeout_);
+            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            {
+                currentContentData[i].animation_type = NONE;
+                currentContentData[i].current_content = display[i];
+            }
 
             // ESP_LOGI(TAG, "%s", display);
         }
@@ -358,7 +434,7 @@ void BOE_48_1504FN::scroll_buffer()
 
 void BOE_48_1504FN::noti_show(const char *str, int timeout)
 {
-    roll_timeout_ = timeout;
+    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     int str_len = strlen(str);
     if (str_len > BUFFER_SIZE)
     {
@@ -389,6 +465,98 @@ void BOE_48_1504FN::noti_show(const char *str, int timeout)
             strncpy(cb->buffer, str + remaining, str_len - remaining);
             cb->length = BUFFER_SIZE;
             cb->buffer[cb->length] = '\0';
+        }
+    }
+}
+
+void BOE_48_1504FN::spectrum_show(float *buf, int size)
+{
+    symbolhelper(LD_0_0, false);
+    symbolhelper(LD_1_0, false);
+    symbolhelper(LD_2_0, false);
+    symbolhelper(LD_3_0, false);
+    symbolhelper(LD_4_0, false);
+    symbolhelper(RD_0_0, false);
+    symbolhelper(RD_1_0, false);
+    symbolhelper(RD_2_0, false);
+    symbolhelper(RD_3_0, false);
+    symbolhelper(RD_4_0, false);
+
+    int fft_level_l = 0, fft_level_r = 0;
+    for (int i = size / 4; i < size * 3 / 4; i++)
+    {
+        if (i % 2)
+            fft_level_l += buf[i];
+        else
+            fft_level_r += buf[i];
+    }
+    fft_level_l /= (size / 4);
+    fft_level_r /= (size / 4);
+
+    if (fft_level_l > 5)
+        symbolhelper(RD_0_0, true);
+    if (fft_level_l > 25)
+        symbolhelper(RD_1_0, true);
+    if (fft_level_l > 45)
+        symbolhelper(RD_2_0, true);
+    if (fft_level_l > 65)
+        symbolhelper(RD_3_0, true);
+    if (fft_level_l > 85)
+        symbolhelper(RD_4_0, true);
+
+    if (fft_level_r > 5)
+        symbolhelper(LD_0_0, true);
+    if (fft_level_r > 25)
+        symbolhelper(LD_1_0, true);
+    if (fft_level_r > 45)
+        symbolhelper(LD_2_0, true);
+    if (fft_level_r > 65)
+        symbolhelper(LD_3_0, true);
+    if (fft_level_r > 85)
+        symbolhelper(LD_4_0, true);
+
+    symbolhelper(L_0_0, false);
+    symbolhelper(L_1_0, false);
+    symbolhelper(R_0_0, false);
+    symbolhelper(R_1_0, false);
+
+    for (size_t i = 0; i < 14; i++)
+    {
+        symbolhelper(bar_L_3[i], false);
+        symbolhelper(bar_L_4[i], false);
+        symbolhelper(bar_R_3[i], false);
+        symbolhelper(bar_R_4[i], false);
+    }
+    int len_single = (size / 28);
+    for (int i = 0; i < 28; i++)
+    {
+        int level_sum = 0;
+        for (int j = 0; j < len_single; j++)
+        {
+            level_sum += buf[i * len_single + j];
+        }
+        level_sum /= len_single;
+        if (i % 2)
+        {
+            if (level_sum > 10)
+                symbolhelper(L_0_0, true);
+            if (level_sum > 30)
+                symbolhelper(L_1_0, true);
+            if (level_sum > 50)
+                symbolhelper(bar_L_3[i], true);
+            if (level_sum > 75)
+                symbolhelper(bar_L_4[i], true);
+        }
+        else
+        {
+            if (level_sum > 10)
+                symbolhelper(R_0_0, true);
+            if (level_sum > 30)
+                symbolhelper(R_1_0, true);
+            if (level_sum > 50)
+                symbolhelper(bar_R_3[i], true);
+            if (level_sum > 75)
+                symbolhelper(bar_R_4[i], true);
         }
     }
 }

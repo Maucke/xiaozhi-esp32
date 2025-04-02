@@ -22,10 +22,11 @@ class FFTDspProcessor
 {
 public:
     FFTDspProcessor();
-    ~FFTDspProcessor();
+
+    size_t GetFeedSize();
 
     void Initialize();
-    void Input(const std::vector<int16_t> &data);
+    void Feed(const std::vector<int16_t> &data);
     void OnOutput(std::function<void(std::vector<float> &&data)> callback);
 
 private:

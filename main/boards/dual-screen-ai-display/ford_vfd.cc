@@ -423,10 +423,10 @@ void FORD_VFD::clear()
 	memset(&gram[515], 0, 814 - 515);
 #endif
 }
-void FORD_VFD::find_enum_code(Symbols flag, int *byteIndex, int *bitIndex)
+void FORD_VFD::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
 {
 	*byteIndex = symbolPositions[flag].byteIndex;
-	*bitIndex = symbolPositions[flag].bitIndex;
+	*bitMask = symbolPositions[flag].bitMask;
 }
 
 void FORD_VFD::symbolhelper(Symbols symbol, bool is_on)
@@ -434,13 +434,13 @@ void FORD_VFD::symbolhelper(Symbols symbol, bool is_on)
 	if (symbol >= SYMBOL_MAX)
 		return;
 
-	int byteIndex, bitIndex;
-	find_enum_code(symbol, &byteIndex, &bitIndex);
+	int byteIndex, bitMask;
+	find_enum_code(symbol, &byteIndex, &bitMask);
 
 	if (is_on)
-		gram[byteIndex] |= bitIndex;
+		gram[byteIndex] |= bitMask;
 	else
-		gram[byteIndex] &= ~bitIndex;
+		gram[byteIndex] &= ~bitMask;
 }
 
 uint8_t process_bit(uint8_t real, uint8_t realbitdelta, uint8_t phy, uint8_t phybitdelta)

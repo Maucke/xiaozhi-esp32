@@ -580,12 +580,12 @@ void HNA_16MM65T::charhelper(int index, uint32_t code)
  *
  * @param flag The symbol enumeration value used to identify the symbol to be found.
  * @param byteIndex A pointer to an integer used to store the byte index of the symbol.
- * @param bitIndex A pointer to an integer used to store the bit index of the symbol.
+ * @param bitMask A pointer to an integer used to store the bit index of the symbol.
  */
-void HNA_16MM65T::find_enum_code(Symbols flag, int *byteIndex, int *bitIndex)
+void HNA_16MM65T::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
 {
     *byteIndex = symbolPositions[flag].byteIndex;
-    *bitIndex = symbolPositions[flag].bitIndex;
+    *bitMask = symbolPositions[flag].bitMask;
 }
 
 /**
@@ -602,13 +602,13 @@ void HNA_16MM65T::symbolhelper(Symbols symbol, bool is_on)
     if (symbol >= SYMBOL_MAX)
         return;
 
-    int byteIndex, bitIndex;
-    find_enum_code(symbol, &byteIndex, &bitIndex);
+    int byteIndex, bitMask;
+    find_enum_code(symbol, &byteIndex, &bitMask);
 
     if (is_on)
-        internal_gram[byteIndex] |= bitIndex;
+        internal_gram[byteIndex] |= bitMask;
     else
-        internal_gram[byteIndex] &= ~bitIndex;
+        internal_gram[byteIndex] &= ~bitMask;
 }
 
 /**
@@ -675,7 +675,7 @@ void HNA_16MM65T::wavehelper(int index, int level)
     if (level > 8)
         level = 8;
 
-    int byteIndex = wavePositions[index].byteIndex, bitIndex = wavePositions[index].bitIndex;
+    int byteIndex = wavePositions[index].byteIndex, bitMask = wavePositions[index].bitMask;
 
     if (!wavebusy)
         internal_gram[byteIndex + 2] |= 0x80;
@@ -683,14 +683,14 @@ void HNA_16MM65T::wavehelper(int index, int level)
     for (size_t i = 0; i < 7; i++)
     {
         if ((i) >= (8 - level) && level > 1)
-            internal_gram[byteIndex] |= bitIndex;
+            internal_gram[byteIndex] |= bitMask;
         else
-            internal_gram[byteIndex] &= ~bitIndex;
+            internal_gram[byteIndex] &= ~bitMask;
 
-        bitIndex <<= 3;
-        if (bitIndex > 0xFF)
+        bitMask <<= 3;
+        if (bitMask > 0xFF)
         {
-            bitIndex >>= 8;
+            bitMask >>= 8;
             byteIndex++;
         }
     }

@@ -650,44 +650,7 @@ public:
 #if CONFIG_USE_FFT_EFFECT
     virtual void SpectrumShow(float *buf, int size) override
     {
-        symbolhelper(Bar_1, false);
-        symbolhelper(Bar_2, false);
-        symbolhelper(Bar_3, false);
-        symbolhelper(Bar_4, false);
-        symbolhelper(Bar_5, false);
-        symbolhelper(Bar_6, false);
-        symbolhelper(Bar_7, false);
-        symbolhelper(Bar_8, false);
-        symbolhelper(Bar_9, false);
-        symbolhelper(Bar_10, false);
-
-        int fft_level = 0;
-        for (size_t i = size / 4; i < size * 3 / 4; i++)
-        {
-            fft_level += buf[i];
-        }
-        fft_level /= (size / 2);
-
-        if (fft_level > 5)
-            symbolhelper(Bar_1, true);
-        if (fft_level > 15)
-            symbolhelper(Bar_2, true);
-        if (fft_level > 25)
-            symbolhelper(Bar_3, true);
-        if (fft_level > 35)
-            symbolhelper(Bar_4, true);
-        if (fft_level > 45)
-            symbolhelper(Bar_5, true);
-        if (fft_level > 55)
-            symbolhelper(Bar_6, true);
-        if (fft_level > 65)
-            symbolhelper(Bar_7, true);
-        if (fft_level > 75)
-            symbolhelper(Bar_8, true);
-        if (fft_level > 85)
-            symbolhelper(Bar_9, true);
-        if (fft_level > 95)
-            symbolhelper(Bar_10, true);
+        spectrum_show(buf, size);
     }
 #endif
 public:
@@ -756,15 +719,103 @@ public:
         }
     }
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+
+    void SetSubContent(const char *role, const char *content)
+    {
+        // if (!isPureEnglish(content))
+        //     return;
+        if (strcmp(role, "user") == 0)
+        {
+            noti_show(content);
+        }
+        else
+        {
+            noti_show(content);
+        }
+    }
+
+#if CONFIG_USE_FFT_EFFECT
+    virtual void SpectrumShow(float *buf, int size) override
+    {
+        spectrum_show(buf, size);
+    }
+#endif
+
+    virtual void Notification(const std::string &content, int timeout = 2000) override
+    {
+        noti_show((char *)content.c_str(), timeout);
+    }
+
     void SetSubSleep(bool en = true)
     {
+        setsleep(en);
     }
 
     void SetSubBacklight(uint8_t brightness)
     {
+        setbrightness(brightness);
     }
 
-    virtual void OnStateChanged() override {}
+    virtual void OnStateChanged() override
+    {
+        static int count = 0;
+        auto &app = Application::GetInstance();
+        auto device_state = app.GetDeviceState();
+        symbolhelper(LD_KARAOKE, false);
+        symbolhelper(NET, false);
+        symbolhelper(D_PAUSE, false);
+        symbolhelper(RD_V_FADE, false);
+        symbolhelper(D_OUTLINE_0, false);
+        symbolhelper(D_OUTLINE_1, false);
+        symbolhelper(D_OUTLINE_2, false);
+        symbolhelper(D_OUTLINE_3, false);
+        symbolhelper(RD_MIC, false);
+        symbolhelper(RD_USB, false);
+        symbolhelper(PLAY, false);
+        switch (device_state)
+        {
+        case kDeviceStateStarting:
+            symbolhelper(LD_KARAOKE, true);
+            break;
+        case kDeviceStateWifiConfiguring:
+            symbolhelper(NET, true);
+            break;
+        case kDeviceStateIdle:
+            symbolhelper(D_PAUSE, true);
+            break;
+        case kDeviceStateConnecting:
+            symbolhelper(RD_V_FADE, true);
+            break;
+        case kDeviceStateListening:
+            if (app.IsVoiceDetected())
+            {
+                symbolhelper(RD_MIC, true);
+                count = (count + 1) % 5;
+                if (count > 0)
+                    symbolhelper(D_OUTLINE_0, true);
+                if (count > 1)
+                    symbolhelper(D_OUTLINE_1, true);
+                if (count > 2)
+                    symbolhelper(D_OUTLINE_2, true);
+                if (count > 3)
+                    symbolhelper(D_OUTLINE_3, true);
+            }
+            else
+            {
+                symbolhelper(RD_MIC, true);
+            }
+            break;
+        case kDeviceStateSpeaking:
+            symbolhelper(PLAY, true);
+            break;
+        case kDeviceStateUpgrading:
+            symbolhelper(RD_USB, true);
+            break;
+        default:
+            ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
+            return;
+        }
+    }
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
     void SetSubSleep(bool en = true)
     {
@@ -905,7 +956,8 @@ private:
             power_save_ticks_++;
             if (power_save_ticks_ >= SECONDS_TO_SLEEP)
             {
-                ESP_LOGI(TAG, "Timeout, Deep sleep");
+                ESP_LOGI(TAG, "Timeout, Deep sleep, MPU aslo sleep");
+                mpu6050_sleep(mpu6050);
                 Sleep();
             }
         }
@@ -935,6 +987,7 @@ private:
     {
         display_->SetChatMessage("system", "sleepy");
         display_->SetEmotion("sleepy");
+        display_->symbolhelper(BOE_48_1504FN::SLEEP, true);
 #if SUB_DISPLAY_EN && HNA_16MM65T_EN
         display_->Notification("  sleepy  ", 4000);
 #endif
@@ -1167,7 +1220,7 @@ private:
         // Initialize the SPI device interface configuration structure
         spi_device_interface_config_t devcfg = {
             .mode = 3,                      // Set the SPI mode to 3
-            .clock_speed_hz = 400000,       // Set the clock speed to 1MHz
+            .clock_speed_hz = 200000,       // Set the clock speed to 1MHz
             .spics_io_num = PIN_NUM_VFD_CS, // Set the chip select pin
             .flags = SPI_DEVICE_BIT_LSBFIRST,
             .queue_size = 7,
@@ -1803,6 +1856,20 @@ public:
         snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
         display_->num_show(18, temp_str, 3, BT247GN::CLOCKWISE);
         display_->symbolhelper(BT247GN::Point, true);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        if (discharging)
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, false);
+
+        if (charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB, false);
+        if (!discharging && !charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
 #endif
         return true;
     }

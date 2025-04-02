@@ -125,7 +125,7 @@ public:
     typedef struct
     {
         int byteIndex; // Byte index
-        int bitIndex;  // Bit index
+        int bitMask;  // Bit index
     } SymbolPosition;
 
     /**
@@ -459,9 +459,9 @@ protected:
      *
      * @param flag The symbol enumeration value used to identify the symbol to be found.
      * @param byteIndex A pointer to an integer used to store the byte index of the symbol.
-     * @param bitIndex A pointer to an integer used to store the bit index of the symbol.
+     * @param bitMask A pointer to an integer used to store the bit index of the symbol.
      */
-    void find_enum_code(Symbols flag, int *byteIndex, int *bitIndex);
+    void find_enum_code(Symbols flag, int *byteIndex, int *bitMask);
 };
 
 #endif // _HNA_16MM65T_H_
