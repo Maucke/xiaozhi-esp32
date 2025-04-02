@@ -169,6 +169,7 @@ void BOE_48_1504FN::contentanimate()
                 currentContentData[i].animation_type = NONE;
                 currentContentData[i].current_content = tempContentData[i].current_content;
                 currentContentData[i].need_update = true;
+                currentContentData[i].animation_index = -1;
             }
             content_inhibit_time = 0;
         }

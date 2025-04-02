@@ -197,8 +197,8 @@ public:
         SLEEP,
         SYNC,
         NET,
-        RDS,
         R_LINE,
+        RDS,
         PLAY,
         SYMBOL_MAX
     } Symbols;
@@ -363,9 +363,9 @@ public:
         {25 + 6, 2},  // SLEEP
         {25 + 7, 2},  // SYNC
         {25 + 8, 2},  // NET
-        {25 + 9, 1},  // RDS
-        {25 + 9, 2},  // R_LINE
-        {25 + 12, 2}, // PLAY
+        {25 + 9, 1},  // R_LINE
+        {25 + 9, 2},  // RDS
+        {25 + 12, 1}, // PLAY
     };
 
     typedef enum
