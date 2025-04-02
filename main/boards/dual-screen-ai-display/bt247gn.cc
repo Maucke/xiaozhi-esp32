@@ -730,6 +730,7 @@ void BT247GN::pixel_show(int y, const char *str)
         }
     }
 }
+
 void BT247GN::spectrum_show(float *buf, int size)
 {
     symbolhelper(Bar_1, false);

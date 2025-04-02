@@ -528,6 +528,7 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
         symbolhelper(bar_R_4[i], false);
     }
     int len_single = (size / 28);
+    static int count = 0;
     for (int i = 0; i < 28; i++)
     {
         int level_sum = 0;
@@ -543,9 +544,9 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
             if (level_sum > 30)
                 symbolhelper(L_1_0, true);
             if (level_sum > 50)
-                symbolhelper(bar_L_3[i], true);
+                symbolhelper(bar_L_3[(i + count) % 28], true);
             if (level_sum > 75)
-                symbolhelper(bar_L_4[i], true);
+                symbolhelper(bar_L_4[(i + count) % 28], true);
         }
         else
         {
@@ -554,9 +555,10 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
             if (level_sum > 30)
                 symbolhelper(R_1_0, true);
             if (level_sum > 50)
-                symbolhelper(bar_R_3[i], true);
+                symbolhelper(bar_R_3[(i + count) % 28], true);
             if (level_sum > 75)
-                symbolhelper(bar_R_4[i], true);
+                symbolhelper(bar_R_4[(i + count) % 28], true);
         }
     }
+    count++;
 }

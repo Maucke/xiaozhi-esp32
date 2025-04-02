@@ -949,7 +949,6 @@ private:
                 ESP_LOGI(TAG, "Battery too low, Deep sleep, MPU sleep");
                 app.Alert(Lang::Strings::WARNING, Lang::Strings::BATTERY_LOW, "sad", Lang::Sounds::P3_VIBRATION);
                 show_low_power_warning_ = true;
-                mpu6050_sleep(mpu6050);
                 Sleep();
             }
 
@@ -957,7 +956,6 @@ private:
             if (power_save_ticks_ >= SECONDS_TO_SLEEP)
             {
                 ESP_LOGI(TAG, "Timeout, Deep sleep, MPU aslo sleep");
-                mpu6050_sleep(mpu6050);
                 Sleep();
             }
         }
@@ -979,7 +977,93 @@ private:
             display_->symbolhelper(HNA_16MM65T::USB2, false);
         else
             display_->symbolhelper(HNA_16MM65T::USB2, true);
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        static int64_t start_time = esp_timer_get_time() / 1000;
+        int64_t current_time = esp_timer_get_time() / 1000;
+        int64_t elapsed_time = current_time - start_time;
+
+        if (elapsed_time >= 500)
+            start_time = current_time;
+        else
+            return true;
+        static int count = 0;
+        char temp_str[11];
+        snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
+        display_->num_show(14, temp_str, 3, BT247GN::ANTICLOCKWISE);
+        if (charging)
+            display_->symbolhelper(BT247GN::Usb, true);
+        else
+            display_->symbolhelper(BT247GN::Usb, false);
+
+        if (discharging)
+        {
+            display_->symbolhelper(BT247GN::Bat_0, false);
+            display_->symbolhelper(BT247GN::Bat_1, false);
+            display_->symbolhelper(BT247GN::Bat_2, false);
+            display_->symbolhelper(BT247GN::Bat_3, false);
+            display_->symbolhelper(BT247GN::Bat_4, false);
+            display_->symbolhelper(BT247GN::Bat_5, false);
+            display_->symbolhelper(BT247GN::Bat_6, false);
+            if (level > 0)
+                display_->symbolhelper(BT247GN::Bat_1, true);
+            if (level > 25)
+            {
+                display_->symbolhelper(BT247GN::Bat_2, true);
+                display_->symbolhelper(BT247GN::Bat_3, true);
+            }
+            if (level > 50)
+            {
+                display_->symbolhelper(BT247GN::Bat_4, true);
+                display_->symbolhelper(BT247GN::Bat_5, true);
+            }
+            if (level > 75)
+                display_->symbolhelper(BT247GN::Bat_6, true);
+            count = 0;
+        }
+        else
+        {
+            display_->symbolhelper(BT247GN::Bat_0, true);
+            display_->symbolhelper(BT247GN::Bat_1, false);
+            display_->symbolhelper(BT247GN::Bat_2, false);
+            display_->symbolhelper(BT247GN::Bat_3, false);
+            display_->symbolhelper(BT247GN::Bat_4, false);
+            display_->symbolhelper(BT247GN::Bat_5, false);
+            display_->symbolhelper(BT247GN::Bat_6, false);
+            if (count > 0)
+                display_->symbolhelper(BT247GN::Bat_1, true);
+            if (count > 1)
+                display_->symbolhelper(BT247GN::Bat_2, true);
+            if (count > 2)
+                display_->symbolhelper(BT247GN::Bat_3, true);
+            if (count > 3)
+                display_->symbolhelper(BT247GN::Bat_4, true);
+            if (count > 4)
+                display_->symbolhelper(BT247GN::Bat_5, true);
+            if (count > 5)
+                display_->symbolhelper(BT247GN::Bat_6, true);
+            count++;
+            count = count % 7;
+        }
+        snprintf(temp_str, sizeof temp_str, "%4d", (int)(GetBarometer()));
+        display_->num_show(3, temp_str, 4, BT247GN::ANTICLOCKWISE);
+
+        snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
+        display_->num_show(18, temp_str, 3, BT247GN::CLOCKWISE);
+        display_->symbolhelper(BT247GN::Point, true);
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        if (discharging)
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, false);
+
+        if (charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB, false);
+        if (!discharging && !charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
 #endif
     }
 
@@ -989,6 +1073,10 @@ private:
         display_->SetEmotion("sleepy");
         display_->symbolhelper(BOE_48_1504FN::SLEEP, true);
 #if SUB_DISPLAY_EN && HNA_16MM65T_EN
+        display_->Notification("  sleepy  ", 4000);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        display_->Notification("  sleepy  ", 4000);
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         display_->Notification("  sleepy  ", 4000);
 #endif
         vTaskDelay(pdMS_TO_TICKS(4000));
@@ -1002,7 +1090,7 @@ private:
         bool active;
         mpu6050_enable_motiondetection(mpu6050, 1, 20);
         mpu6050_getMotionInterruptStatus(mpu6050, &active);
-        // mpu6050_sleep(mpu6050);
+        mpu6050_sleep(mpu6050); // deactive the mpu, because its lost power to fast
         GetBacklight()->SetBrightness(0);
         display_->SetSubBacklight(0);
         display_->SetSleep(true);
@@ -1781,95 +1869,6 @@ public:
             // ESP_LOGI(TAG, "Battery level: %d, charging: %d", level, charging);
         }
         discharging = !charging;
-#endif
-
-#if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        static int64_t start_time = esp_timer_get_time() / 1000;
-        int64_t current_time = esp_timer_get_time() / 1000;
-        int64_t elapsed_time = current_time - start_time;
-
-        if (elapsed_time >= 500)
-            start_time = current_time;
-        else
-            return true;
-        static int count = 0;
-        char temp_str[11];
-        snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
-        display_->num_show(14, temp_str, 3, BT247GN::ANTICLOCKWISE);
-        if (charging)
-            display_->symbolhelper(BT247GN::Usb, true);
-        else
-            display_->symbolhelper(BT247GN::Usb, false);
-
-        if (discharging)
-        {
-            display_->symbolhelper(BT247GN::Bat_0, false);
-            display_->symbolhelper(BT247GN::Bat_1, false);
-            display_->symbolhelper(BT247GN::Bat_2, false);
-            display_->symbolhelper(BT247GN::Bat_3, false);
-            display_->symbolhelper(BT247GN::Bat_4, false);
-            display_->symbolhelper(BT247GN::Bat_5, false);
-            display_->symbolhelper(BT247GN::Bat_6, false);
-            if (level > 0)
-                display_->symbolhelper(BT247GN::Bat_1, true);
-            if (level > 25)
-            {
-                display_->symbolhelper(BT247GN::Bat_2, true);
-                display_->symbolhelper(BT247GN::Bat_3, true);
-            }
-            if (level > 50)
-            {
-                display_->symbolhelper(BT247GN::Bat_4, true);
-                display_->symbolhelper(BT247GN::Bat_5, true);
-            }
-            if (level > 75)
-                display_->symbolhelper(BT247GN::Bat_6, true);
-            count = 0;
-        }
-        else
-        {
-            display_->symbolhelper(BT247GN::Bat_0, true);
-            display_->symbolhelper(BT247GN::Bat_1, false);
-            display_->symbolhelper(BT247GN::Bat_2, false);
-            display_->symbolhelper(BT247GN::Bat_3, false);
-            display_->symbolhelper(BT247GN::Bat_4, false);
-            display_->symbolhelper(BT247GN::Bat_5, false);
-            display_->symbolhelper(BT247GN::Bat_6, false);
-            if (count > 0)
-                display_->symbolhelper(BT247GN::Bat_1, true);
-            if (count > 1)
-                display_->symbolhelper(BT247GN::Bat_2, true);
-            if (count > 2)
-                display_->symbolhelper(BT247GN::Bat_3, true);
-            if (count > 3)
-                display_->symbolhelper(BT247GN::Bat_4, true);
-            if (count > 4)
-                display_->symbolhelper(BT247GN::Bat_5, true);
-            if (count > 5)
-                display_->symbolhelper(BT247GN::Bat_6, true);
-            count++;
-            count = count % 7;
-        }
-        snprintf(temp_str, sizeof temp_str, "%4d", (int)(GetBarometer()));
-        display_->num_show(3, temp_str, 4, BT247GN::ANTICLOCKWISE);
-
-        snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
-        display_->num_show(18, temp_str, 3, BT247GN::CLOCKWISE);
-        display_->symbolhelper(BT247GN::Point, true);
-#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
-        if (discharging)
-            display_->symbolhelper(BOE_48_1504FN::RD_BAT, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::RD_BAT, false);
-
-        if (charging)
-            display_->symbolhelper(BOE_48_1504FN::D_USB, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::D_USB, false);
-        if (!discharging && !charging)
-            display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
 #endif
         return true;
     }
