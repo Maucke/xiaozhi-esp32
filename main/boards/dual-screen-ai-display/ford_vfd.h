@@ -103,6 +103,7 @@ public:
     {
         _mode = mode;
     }
+    SpectrumDisplay *_spectrum;
 
 protected:
     uint8_t find_hex_code(char ch);
@@ -234,7 +235,6 @@ private:
     uint8_t dimming = 0;
     spi_device_handle_t spi_device_;
     NumberData currentData[NUM_COUNT] = {0};
-    SpectrumDisplay *_spectrum;
     void init();
     void init_task();
     void contentanimate();

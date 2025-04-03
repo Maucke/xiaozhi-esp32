@@ -139,11 +139,12 @@ int BOE_48_1504FN::get_cgram()
     return -1;
 }
 
-void BOE_48_1504FN::free_cgram(int index)
+void BOE_48_1504FN::free_cgram(int *index)
 {
-    if (index > 2)
+    if (*index > 2 || *index < 0)
         return;
-    cgramBusy[index] = false;
+    cgramBusy[*index] = false;
+    *index = -1;
 }
 
 void BOE_48_1504FN::contentanimate()
@@ -169,8 +170,9 @@ void BOE_48_1504FN::contentanimate()
                 currentContentData[i].animation_type = NONE;
                 currentContentData[i].current_content = tempContentData[i].current_content;
                 currentContentData[i].need_update = true;
-                currentContentData[i].animation_index = -1;
+                free_cgram(&currentContentData[i].animation_index);
             }
+
             content_inhibit_time = 0;
         }
     }
@@ -187,7 +189,8 @@ void BOE_48_1504FN::contentanimate()
                     charhelper(i, ' ');
                 else
                     charhelper(i, currentContentData[i].current_content);
-                currentContentData[i].animation_index = -1;
+                free_cgram(&currentContentData[i].animation_index);
+
                 continue;
             }
 
@@ -195,7 +198,10 @@ void BOE_48_1504FN::contentanimate()
             {
                 currentContentData[i].animation_index = get_cgram();
                 if (currentContentData[i].animation_index == -1)
+                {
+                    ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
                     return;
+                }
             }
             currentContentData[i].animation_step++;
             const uint8_t *before_raw_code = find_content_hex_code(currentContentData[i].last_content);
@@ -296,8 +302,7 @@ void BOE_48_1504FN::contentanimate()
                     charhelper(i, ' ');
                 else
                     charhelper(i, currentContentData[i].current_content);
-                free_cgram(currentContentData[i].animation_index);
-                currentContentData[i].animation_index = -1;
+                free_cgram(&currentContentData[i].animation_index);
             }
             else
             {
@@ -350,6 +355,7 @@ void BOE_48_1504FN::content_show(int start, const char *buf, int size, bool forc
 
 void BOE_48_1504FN::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
 {
+    // ESP_LOGI(TAG, "byteIndex: %d, flag: %d", *byteIndex, flag);
     *byteIndex = symbolPositions[flag].byteIndex;
     *bitMask = symbolPositions[flag].bitMask;
 }
@@ -545,9 +551,9 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
             if (level_sum > 30)
                 symbolhelper(L_1_0, true);
             if (level_sum > 50)
-                symbolhelper(bar_L_3[(i + count) % 28], true);
+                symbolhelper(bar_L_3[(i + count) % 14], true);
             if (level_sum > 75)
-                symbolhelper(bar_L_4[(i + count) % 28], true);
+                symbolhelper(bar_L_4[(i + count) % 14], true);
         }
         else
         {
@@ -556,9 +562,9 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
             if (level_sum > 30)
                 symbolhelper(R_1_0, true);
             if (level_sum > 50)
-                symbolhelper(bar_R_3[(i + count) % 28], true);
+                symbolhelper(bar_R_3[(i + count) % 14], true);
             if (level_sum > 75)
-                symbolhelper(bar_R_4[(i + count) % 28], true);
+                symbolhelper(bar_R_4[(i + count) % 14], true);
         }
     }
     count++;

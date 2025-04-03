@@ -28,7 +28,7 @@ class BOE_48_1504FN : protected PT6302
 {
 #define BUFFER_SIZE 256
 #define DISPLAY_SIZE 10
-#define SYMBOL_COUNT 166
+#define SYMBOL_COUNT 162
 public:
     typedef struct
     {
@@ -519,7 +519,7 @@ private:
     void init_task();
     void contentanimate();
     int get_cgram();
-    void free_cgram(int index);
+    void free_cgram(int *index);
     void display_buffer();
     void scroll_buffer();
     const uint8_t *find_content_hex_code(char ch);

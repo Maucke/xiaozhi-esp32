@@ -173,6 +173,8 @@ void PT6302::setbrightness(uint8_t brightness)
     dimming = brightness * 8 / 100;
     if (dimming > 7)
         dimming = 7;
+    if (dimming < 1)
+        dimming = 1;
     // ESP_LOGI(TAG, "dimming %d", dimming);
     return;
 }

@@ -76,6 +76,8 @@ void FORD_VFD::write_data8(uint8_t *dat, int len)
 void FORD_VFD::setbrightness(uint8_t brightness)
 {
 	dimming = brightness * 127 / 100;
+	if (dimming < 5)
+		dimming = 5;
 	ESP_LOGI(TAG, "FORD_VFD dimming: %d, %d", dimming, brightness);
 }
 
@@ -300,7 +302,7 @@ void FORD_VFD::init_task()
 			vTaskDelete(NULL);
 		},
 		"vfd",
-		4096,
+		4096 - 1024,
 		this,
 		6,
 		nullptr);

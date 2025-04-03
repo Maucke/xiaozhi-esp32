@@ -692,13 +692,12 @@ void Application::OnAudioOutput() {
 
 void Application::OnAudioInput() {
     std::vector<int16_t> data;
-#if CONFIG_USE_FFT_EFFECT
-    ReadAudio(data, 16000, fft_dsp_processor_.GetFeedSize());
-    fft_dsp_processor_.Feed(data);
-#endif
 #if CONFIG_USE_WAKE_WORD_DETECT
     if (wake_word_detect_.IsDetectionRunning()) {
         ReadAudio(data, 16000, wake_word_detect_.GetFeedSize());
+#if CONFIG_USE_FFT_EFFECT
+    fft_dsp_processor_.Feed(data);
+#endif
         wake_word_detect_.Feed(data);
         return;
     }
@@ -707,11 +706,17 @@ void Application::OnAudioInput() {
     if (audio_processor_.IsRunning()) {
         ReadAudio(data, 16000, audio_processor_.GetFeedSize());
         audio_processor_.Feed(data);
+#if CONFIG_USE_FFT_EFFECT
+    fft_dsp_processor_.Feed(data);
+#endif
         return;
     }
 #else
     if (device_state_ == kDeviceStateListening) {
         ReadAudio(data, 16000, 30 * 16000 / 1000);
+#if CONFIG_USE_FFT_EFFECT
+    fft_dsp_processor_.Feed(data);
+#endif
         background_task_->Schedule([this, data = std::move(data)]() mutable {
             opus_encoder_->Encode(std::move(data), [this](std::vector<uint8_t>&& opus) {
                 Schedule([this, opus = std::move(opus)]() {

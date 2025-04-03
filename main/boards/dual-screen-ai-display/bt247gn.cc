@@ -125,6 +125,8 @@ void BT247GN::test()
 void BT247GN::setbrightness(uint8_t brightness)
 {
     dimming = brightness;
+	if (dimming < 5)
+		dimming = 5;
 }
 
 void BT247GN::setsleep(bool en)

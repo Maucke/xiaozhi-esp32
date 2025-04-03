@@ -330,6 +330,8 @@ public:
         SetSubContent(content);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         SetSubContent(role, content);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        SetSubContent(content);
 #endif
         // std::stringstream ss;
         // ss << "role: " << role << ", content: " << content << std::endl;
@@ -425,7 +427,7 @@ public:
 
         esp_timer_stop(notification_timer_);
         ESP_ERROR_CHECK(esp_timer_start_once(notification_timer_, duration_ms * 1000));
-        SetSubContent(notification);
+        SetSubContent(notification.c_str());
     }
 
     void SetSubBacklight(uint8_t brightness)
@@ -720,18 +722,10 @@ public:
     }
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
 
-    void SetSubContent(const char *role, const char *content)
+    void SetSubContent(const char *content)
     {
-        // if (!isPureEnglish(content))
-        //     return;
-        if (strcmp(role, "user") == 0)
-        {
-            noti_show(content);
-        }
-        else
-        {
-            noti_show(content);
-        }
+        int len = strlen(content);
+        noti_show(content, len * 300);
     }
 
 #if CONFIG_USE_FFT_EFFECT
@@ -772,6 +766,7 @@ public:
         symbolhelper(RD_MIC, false);
         symbolhelper(RD_USB, false);
         symbolhelper(PLAY, false);
+        symbolhelper(D_OUTLINE_3, true);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -790,15 +785,13 @@ public:
             if (app.IsVoiceDetected())
             {
                 symbolhelper(RD_MIC, true);
-                count = (count + 1) % 5;
+                count = (count + 1) % 3;
                 if (count > 0)
                     symbolhelper(D_OUTLINE_0, true);
                 if (count > 1)
                     symbolhelper(D_OUTLINE_1, true);
                 if (count > 2)
                     symbolhelper(D_OUTLINE_2, true);
-                if (count > 3)
-                    symbolhelper(D_OUTLINE_3, true);
             }
             else
             {
@@ -1045,7 +1038,7 @@ private:
         rtc_gpio_pullup_en(WAKE_INT_NUM);
         esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
         // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
-        esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
+        // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
 #else
         rtc_gpio_pullup_en(TOUCH_INT_NUM);
         esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
