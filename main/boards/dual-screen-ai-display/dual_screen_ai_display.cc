@@ -42,6 +42,7 @@
 #include "mpu6050.h"
 #include "ina3221.h"
 #include "pcf8574.h"
+#include "physics.h"
 
 #define TAG "DualScreenAIDisplay"
 
@@ -1443,6 +1444,48 @@ private:
         }
     }
 
+    void test()
+    {
+        mpu6050_acce_value_t acce_value;
+        physics_init();
+
+        float ax = 1, ay = 0, az = 0;
+        while (1)
+        {
+            printf("\033[2J\033[H");
+            auto ret = mpu6050_get_acce(mpu6050, &acce_value);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to read acceleration data: %s", esp_err_to_name(ret));
+            }
+            else
+            {
+                char acce_str[100];
+                snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
+                         (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
+                ESP_LOGI(TAG, "%s", acce_str);
+                {
+                    float gx = acce_value.acce_x;
+                    float gy = -acce_value.acce_y;
+                    physics_update(gx * 9.8, gy * 9.8, 0.1);
+                }
+    
+                char grid[GRID_HEIGHT][GRID_WIDTH];
+                physics_render_to_grid(grid);
+    
+                for (int y = 0; y < GRID_HEIGHT; y++)
+                {
+                    for (int x = 0; x < GRID_WIDTH; x++)
+                    {
+                        printf("%c ", grid[y][x]);
+                    }
+                    printf("\n");
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+    }
+
 public:
     DualScreenAIDisplay()
     {
@@ -1453,8 +1496,10 @@ public:
         }
 
         vTaskDelay(pdMS_TO_TICKS(120));
+
         InitializeAdc();
         InitializeI2c();
+        test();
 #if ESP_DUAL_DISPLAY_V2
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
