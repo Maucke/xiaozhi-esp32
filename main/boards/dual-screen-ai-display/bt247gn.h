@@ -49,7 +49,7 @@ class BT247GN
 public:
 #define PIXEL_COUNT (20)
 #define NUM_COUNT (21)
-#define ICON_COUNT (50)
+#define ICON_COUNT (51)
 #define CHAR_SIZE (95 + 1)
     //  Hexadecimal code corresponding to each character
     //  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz
@@ -758,8 +758,8 @@ public:
         Sd,
         Cd,
         Lock,
+        TempO,
         Key,
-
         L1,
         _1,
         _2,

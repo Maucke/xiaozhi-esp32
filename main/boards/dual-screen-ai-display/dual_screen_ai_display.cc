@@ -1465,8 +1465,8 @@ private:
                          (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
                 ESP_LOGI(TAG, "%s", acce_str);
                 {
-                    float gx = acce_value.acce_x;
-                    float gy = -acce_value.acce_y;
+                    float gx = -acce_value.acce_y;
+                    float gy = acce_value.acce_z;
                     physics_update(gx * 9.8, gy * 9.8, 0.1);
                 }
     
@@ -1499,7 +1499,7 @@ public:
 
         InitializeAdc();
         InitializeI2c();
-        test();
+        // test();
 #if ESP_DUAL_DISPLAY_V2
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
@@ -1764,7 +1764,7 @@ public:
         {
             voltage = ina3221->getBusVoltage(i);
             current = ina3221->getCurrent(i);
-            ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+            // ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
         }
 #else
         static int last_level = 0;

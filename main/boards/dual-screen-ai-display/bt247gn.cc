@@ -82,6 +82,11 @@ BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 
 void BT247GN::init_task()
 {
+    symbolhelper(Auto, true);
+    symbolhelper(Key, true);
+    symbolhelper(All, true);
+    symbolhelper(TempO, true);
+    symbolhelper(Lock, true);
     xTaskCreate(
         [](void *arg)
         {

@@ -2,7 +2,7 @@
 
 #define GRID_WIDTH 10
 #define GRID_HEIGHT 9
-#define BALL_COUNT 8
+#define BALL_COUNT 18
 
 typedef struct {
     float x, y;
