@@ -301,18 +301,9 @@ void Display::SetChatMessage(const char *role, const char *content)
     lv_label_set_text(chat_message_label_, content);
 }
 
-void Display::SetBacklight(uint8_t brightness)
-{
-    Settings settings("display", true);
-    settings.SetInt("brightness", brightness);
-    brightness_ = brightness;
-}
-
 void Display::Notification(const std::string &content, int timeout)
 {
 }
-
-int Display::GetBacklight() { return 0; };
 
 void Display::SetTheme(const std::string& theme_name) {
     current_theme_name_ = theme_name;

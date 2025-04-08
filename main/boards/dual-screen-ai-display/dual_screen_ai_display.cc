@@ -48,6 +48,7 @@
 
 LV_FONT_DECLARE(font_awesome_16_4);
 LV_FONT_DECLARE(font_puhui_16_4);
+LV_FONT_DECLARE(font_awesome_30_4);
 LV_FONT_DECLARE(font_puhui_14_1);
 
 #define LCD_BIT_PER_PIXEL (16)
@@ -65,7 +66,7 @@ static const sh8601_lcd_init_cmd_t vendor_specific_init[] = {
     {0x2A, (uint8_t[]){0x00, 0x00, 0x02, 0x17}, 4, 0},
     {0x2B, (uint8_t[]){0x00, 0x00, 0x00, 0xEF}, 4, 0},
     {0x29, (uint8_t[]){0x00}, 0, 10},
-    {0x51, (uint8_t[]){0xFF}, 1, 0},
+    {0x51, (uint8_t[]){0x00}, 1, 0},
 };
 
 class CustomLcdDisplay : public QspiLcdDisplay
@@ -193,18 +194,12 @@ public:
         lv_obj_set_height((lv_obj_t *)var, v);
     }
 
-    static void btn_pressed_cb(lv_event_t *e)
+    static void btn_clicked_cb(lv_event_t *e)
     {
-        ESP_LOGI(TAG, "Button pressed");
-        Application::GetInstance().StartListening();
+        auto &app = Application::GetInstance();
+        app.ToggleChatState();
     }
 
-    // 按键抬起回调函数
-    static void btn_released_cb(lv_event_t *e)
-    {
-        ESP_LOGI(TAG, "Button released");
-        Application::GetInstance().StopListening();
-    }
 #define BTNWIDTH 150
     void SetupUI()
     {
@@ -316,12 +311,11 @@ public:
         lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_GREY), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_t *mic_label = lv_label_create(btn);
-        lv_label_set_text(mic_label, "按下说话");
-        lv_obj_set_style_text_font(mic_label, &font_puhui_16_4, 0);
+        lv_label_set_text(mic_label, "AI");
+        lv_obj_set_style_text_font(mic_label, &font_awesome_30_4, 0);
         lv_obj_center(mic_label);
 
-        lv_obj_add_event_cb(btn, btn_pressed_cb, LV_EVENT_PRESSED, NULL);
-        lv_obj_add_event_cb(btn, btn_released_cb, LV_EVENT_RELEASED, NULL);
+        lv_obj_add_event_cb(btn, btn_clicked_cb, LV_EVENT_CLICKED, NULL);
     }
     virtual void SetChatMessage(const char *role, const char *content) override
     {
@@ -1136,10 +1130,13 @@ private:
         // #endif
         //                                });
 
-        touch_button_->OnPressDown([this]()
-                                   { Application::GetInstance().StartListening(); });
-        touch_button_->OnPressUp([this]()
-                                 { Application::GetInstance().StopListening(); });
+        touch_button_->OnClick([this]()
+                               {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                ResetWifiConfiguration();
+            }
+            app.ToggleChatState(); });
     }
 
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
@@ -1344,6 +1341,9 @@ private:
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
                                         DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
                                         DISPLAY_SWAP_XY, spi_device);
+        GetBacklight()->SetBrightness(0);
+        display_->SetSubBacklight(0);
+
         if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
         {
             ESP_LOGI(TAG, "Enable amoled power");
@@ -1469,10 +1469,10 @@ private:
                     float gy = acce_value.acce_z;
                     physics_update(gx * 9.8, gy * 9.8, 0.1);
                 }
-    
+
                 char grid[GRID_HEIGHT][GRID_WIDTH];
                 physics_render_to_grid(grid);
-    
+
                 for (int y = 0; y < GRID_HEIGHT; y++)
                 {
                     for (int x = 0; x < GRID_WIDTH; x++)

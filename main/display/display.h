@@ -33,8 +33,6 @@ public:
     virtual void SetChatMessage(const char *role, const char *content);
     virtual void Notification(const std::string &content, int timeout);
     virtual void SetIcon(const char *icon);
-    virtual void SetBacklight(uint8_t brightness);
-    virtual int GetBacklight();
 #if CONFIG_USE_FFT_EFFECT
     virtual void SpectrumShow(float *buf, int size) {}
 #endif
