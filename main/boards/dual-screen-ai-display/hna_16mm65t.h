@@ -227,7 +227,7 @@ private:
         0xe248f0, // Z
     };
     // Position of each symbol in the display buffer
-    const SymbolPosition symbolPositions[100] = {
+    SymbolPosition symbolPositions[100] = {
         {0, 2},     // R_OUTER_B
         {0, 4},     // R_OUTER_A
         {0, 8},     // R_CENTER

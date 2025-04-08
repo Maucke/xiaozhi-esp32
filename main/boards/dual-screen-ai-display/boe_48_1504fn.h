@@ -205,7 +205,7 @@ public:
         SYMBOL_MAX
     } Symbols;
 
-    const SymbolPosition symbolPositions[SYMBOL_COUNT] = {
+    SymbolPosition symbolPositions[SYMBOL_COUNT] = {
         {0, 1},       // L_0_0
         {0, 2},       // L_3_9
         {0, 4},       // L_4_7

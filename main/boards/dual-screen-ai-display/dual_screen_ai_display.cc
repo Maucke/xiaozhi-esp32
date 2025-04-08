@@ -50,7 +50,6 @@
 
 LV_FONT_DECLARE(font_awesome_16_4);
 LV_FONT_DECLARE(font_puhui_16_4);
-LV_FONT_DECLARE(font_awesome_30_4);
 LV_FONT_DECLARE(font_puhui_14_1);
 
 #define LCD_BIT_PER_PIXEL (16)
@@ -321,7 +320,7 @@ public:
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_t *mic_label = lv_label_create(btn);
         lv_label_set_text(mic_label, "AI");
-        lv_obj_set_style_text_font(mic_label, &font_awesome_30_4, 0);
+        lv_obj_set_style_text_font(mic_label, &font_puhui_16_4, 0);
         lv_obj_center(mic_label);
 
         lv_obj_add_event_cb(btn, btn_clicked_cb, LV_EVENT_CLICKED, NULL);
@@ -1598,7 +1597,7 @@ private:
                 {
                     float gx = -acce_value.acce_y;
                     float gy = acce_value.acce_z;
-                    physics_update(gx * 9.8, gy * 9.8, 0.1);
+                    physics_update(gx * 9.8 * 2, gy * 9.8 * 2, 0.1);
                 }
 
                 char grid[GRID_HEIGHT][GRID_WIDTH];
@@ -1630,7 +1629,7 @@ public:
 
         InitializeAdc();
         InitializeI2c();
-        // test();
+        test();
 #if ESP_DUAL_DISPLAY_V2
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
