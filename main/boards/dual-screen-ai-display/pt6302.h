@@ -19,8 +19,8 @@
  */
 class PT6302
 {
+#define MAX_NUM_SIZE 16
 #define CGRAM_SIZE 8
-#define SYMBOL_CGRAM_SIZE 5
 public:
     enum class Mode
     {
@@ -33,12 +33,11 @@ public:
     {
         struct
         {
-            uint8_t number[10];
-            uint8_t symbol[15];
-            uint8_t cgram[SYMBOL_CGRAM_SIZE * 5];
-            uint8_t cgram_number[(CGRAM_SIZE - SYMBOL_CGRAM_SIZE) * 5];
+            uint8_t number[MAX_NUM_SIZE];
+            uint8_t symbol[MAX_NUM_SIZE];
+            uint8_t cgram[CGRAM_SIZE * 5];
         };
-        uint8_t array[10 + 15 + 5 * CGRAM_SIZE];
+        uint8_t array[MAX_NUM_SIZE + MAX_NUM_SIZE + 5 * CGRAM_SIZE];
     } Gram;
 
     PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
@@ -51,20 +50,18 @@ public:
 private:
     uint8_t dimming = 1;
     spi_device_handle_t spi_device_;
-    const unsigned int digits = 15;
-
+    unsigned int digits = 15;
     void write_data8(uint8_t *dat, int len);
+
+protected:
+    Gram internal_gram; // Display buffer 10 num + 15 ad + 5 cgram
+    virtual void refrash(Gram *gram) {};
     void write_dcram(int index, uint8_t *dat, int len);
     void write_adram(int index, uint8_t *dat, int len);
     void write_cgram(int index, uint8_t *dat, int len = 5);
     void write_dimming();
     void write_grnum(unsigned int amount = 15);
     void write_mode(PT6302::Mode mode);
-
-protected:
-    Gram internal_gram; // Display buffer 10 num + 15 ad + 5 cgram
-    void refrash(Gram *gram);
-    void refrash();
 };
 
 #endif

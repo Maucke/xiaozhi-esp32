@@ -29,6 +29,8 @@ class BOE_48_1504FN : protected PT6302
 #define BUFFER_SIZE 256
 #define DISPLAY_SIZE 10
 #define SYMBOL_COUNT 162
+#define SYMBOL_CGRAM_SIZE 5
+#define GR_COUNT 15
 public:
     typedef struct
     {
@@ -203,7 +205,7 @@ public:
         SYMBOL_MAX
     } Symbols;
 
-    SymbolPosition symbolPositions[SYMBOL_COUNT] = {
+    const SymbolPosition symbolPositions[SYMBOL_COUNT] = {
         {0, 1},       // L_0_0
         {0, 2},       // L_3_9
         {0, 4},       // L_4_7
@@ -507,6 +509,7 @@ public:
     void symbolhelper(Symbols symbol, bool is_on);
 
 private:
+    const unsigned int digits = 15;
     bool cgramBusy[3] = {0};
     ContentData currentContentData[DISPLAY_SIZE] = {0};
     ContentData tempContentData[DISPLAY_SIZE] = {0};
@@ -525,6 +528,7 @@ private:
     const uint8_t *find_content_hex_code(char ch);
     void find_enum_code(Symbols flag, int *byteIndex, int *bitMask);
 
+    void refrash(Gram *gram) override;
 protected:
     void charhelper(int index, char ch);                     // write to dcram
     void charhelper(int index, int ramindex, uint8_t *code); // write to cgram, then index from the dcram

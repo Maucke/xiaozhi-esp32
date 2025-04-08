@@ -1,4 +1,4 @@
-#include "boe_48_1504fn.h"
+#include "huv_13ss16t.h"
 #include "driver/usb_serial_jtag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
@@ -7,7 +7,7 @@
 #include <esp_log.h>
 
 // Define the log tag
-#define TAG "BOE_48_1504FN"
+#define TAG "HUV_13SS16T"
 
 /**
  * @brief Constructor for the PT6302 class.
@@ -19,21 +19,21 @@
  * @param cs The GPIO pin number for the chip select line.
  * @param spi_num The SPI host device number to use for communication.
  */
-BOE_48_1504FN::BOE_48_1504FN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
+HUV_13SS16T::HUV_13SS16T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
 {
     init();
     init_task();
-    ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
+    ESP_LOGI(TAG, "HUV_13SS16T Initalized");
 }
 
 /**
- * @brief Constructor of the BOE_48_1504FN class.
+ * @brief Constructor of the HUV_13SS16T class.
  *
  * Initializes the PT6302 device and creates a task to refresh the display and perform animations.
  *
  * @param spi_device The SPI device handle used to communicate with the PT6302.
  */
-BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device)
+HUV_13SS16T::HUV_13SS16T(spi_device_handle_t spi_device) : PT6302(spi_device)
 {
     if (!spi_device)
     {
@@ -42,24 +42,61 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
     }
     init();
     init_task();
-    ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
+    ESP_LOGI(TAG, "HUV_13SS16T Initalized");
 }
 
-void BOE_48_1504FN::refrash(Gram *gram)
+void HUV_13SS16T::refrash(Gram *gram)
 {
     if (gram == nullptr)
         return;
     write_cgram(0, gram->cgram, CGRAM_SIZE * 5);
-    write_dcram(0, gram->number, DISPLAY_SIZE);
+    write_dcram(5, gram->number, DISPLAY_SIZE);
     write_adram(0, gram->symbol, GR_COUNT);
     write_dimming();
 }
 
-void BOE_48_1504FN::init_task()
+void HUV_13SS16T::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
+{
+    if (flag >= SYMBOL_MAX)
+        return;
+    int index = (int)flag;
+    if (35 == (index % 36))
+    {
+        *byteIndex = 25 + (index / 36);
+        *bitMask = 1;
+    }
+    else
+    {
+        *byteIndex = ((index / 36) * 5) + (index % 36) / 7;
+        *bitMask = 1 << ((index % 36) % 7);
+    }
+}
+
+void HUV_13SS16T::draw_code(Symbols flag, uint8_t dot)
+{
+    int byteIndex, bitMask;
+    find_enum_code(flag, &byteIndex, &bitMask);
+    if (dot)
+        internal_gram.cgram[byteIndex] |= bitMask;
+    else
+        internal_gram.cgram[byteIndex] &= ~bitMask;
+}
+
+void HUV_13SS16T::draw_point(int x, int y, uint8_t dot)
+{
+    if (x >= MAX_X)
+        return;
+    if (y >= MAX_Y)
+        return;
+    draw_code(pixelMap[y][x][0], dot);
+    draw_code(pixelMap[y][x][1], dot);
+}
+
+void HUV_13SS16T::init_task()
 {
     const uint8_t values[5] = {
         0, 1, 2, 3, 4};
-    write_dcram(10, (uint8_t *)values, 5);
+    write_dcram(0, (uint8_t *)values, 5);
     write_grnum(GR_COUNT);
     // noti_show("Test long string present: 0123456789", 5000);
     memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
@@ -74,20 +111,12 @@ void BOE_48_1504FN::init_task()
         tempContentData[i].animation_index = -1;
     }
 
-    symbolhelper(L_OUTLINE, true);
-    symbolhelper(R_OUTLINE, true);
-    symbolhelper(LD_LINE, true);
-    symbolhelper(RD_LINE, true);
-    symbolhelper(D_OUTLINE, true);
-    symbolhelper(L_LINE, true);
-    symbolhelper(R_LINE, true);
-
     refrash(&internal_gram);
     xTaskCreate(
         [](void *arg)
         {
             int count = 0;
-            BOE_48_1504FN *vfd = static_cast<BOE_48_1504FN *>(arg);
+            HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
             // char tempstr[10];
 
             while (true)
@@ -96,7 +125,7 @@ void BOE_48_1504FN::init_task()
                 // vfd->internal_gram.cgram[count / 8 % 25] = 1 << (count % 8);
 
                 // snprintf(tempstr, 10, "%d-%d", count / 8 % 25, count % 8);
-                // vfd->content_show(0, tempstr, 4, false, BOE_48_1504FN::NONE);
+                // vfd->content_show(0, tempstr, 4, false, HUV_13SS16T::NONE);
                 // vfd->symbolhelper((Symbols)((count / 10) % SYMBOL_COUNT), false);
                 if (!((++count) % 12))
                 {
@@ -117,13 +146,13 @@ void BOE_48_1504FN::init_task()
         nullptr);
 }
 
-void BOE_48_1504FN::charhelper(int index, char ch)
+void HUV_13SS16T::charhelper(int index, char ch)
 {
     if (index <= (DISPLAY_SIZE - 1))
         internal_gram.number[index] = ch;
 }
 
-void BOE_48_1504FN::charhelper(int index, int ramindex, uint8_t *code)
+void HUV_13SS16T::charhelper(int index, int ramindex, uint8_t *code)
 {
     if (index <= (DISPLAY_SIZE - 1) && ramindex <= 2)
     {
@@ -133,14 +162,14 @@ void BOE_48_1504FN::charhelper(int index, int ramindex, uint8_t *code)
     }
 }
 
-const uint8_t *BOE_48_1504FN::find_content_hex_code(char ch)
+const uint8_t *HUV_13SS16T::find_content_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= ('~' + 1))
         return hex_codes[ch - ' '];
     return hex_codes[0];
 }
 
-int BOE_48_1504FN::get_cgram()
+int HUV_13SS16T::get_cgram()
 {
     for (size_t i = 0; i < 3; i++)
     {
@@ -153,7 +182,7 @@ int BOE_48_1504FN::get_cgram()
     return -1;
 }
 
-void BOE_48_1504FN::free_cgram(int *index)
+void HUV_13SS16T::free_cgram(int *index)
 {
     if (*index > 2 || *index < 0)
         return;
@@ -161,7 +190,7 @@ void BOE_48_1504FN::free_cgram(int *index)
     *index = -1;
 }
 
-void BOE_48_1504FN::contentanimate()
+void HUV_13SS16T::contentanimate()
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
     int64_t current_time = esp_timer_get_time() / 1000;
@@ -326,7 +355,7 @@ void BOE_48_1504FN::contentanimate()
     }
 }
 
-void BOE_48_1504FN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
+void HUV_13SS16T::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     for (size_t i = 0; i < DISPLAY_SIZE; i++)
@@ -345,7 +374,7 @@ void BOE_48_1504FN::noti_show(int start, const char *buf, int size, bool forceup
     }
 }
 
-void BOE_48_1504FN::content_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+void HUV_13SS16T::content_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
 {
     if (content_inhibit_time != 0)
     {
@@ -367,39 +396,7 @@ void BOE_48_1504FN::content_show(int start, const char *buf, int size, bool forc
     }
 }
 
-void BOE_48_1504FN::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
-{
-    // ESP_LOGI(TAG, "byteIndex: %d, flag: %d", *byteIndex, flag);
-    *byteIndex = symbolPositions[flag].byteIndex;
-    *bitMask = symbolPositions[flag].bitMask;
-}
-
-void BOE_48_1504FN::symbolhelper(Symbols symbol, bool is_on)
-{
-    if (symbol >= SYMBOL_MAX)
-        return;
-
-    int byteIndex, bitMask;
-    find_enum_code(symbol, &byteIndex, &bitMask);
-
-    if (byteIndex < 25)
-    {
-        // ESP_LOGI(TAG, "byteIndex: %d", byteIndex);
-        if (is_on)
-            internal_gram.cgram[byteIndex] |= bitMask;
-        else
-            internal_gram.cgram[byteIndex] &= ~bitMask;
-    }
-    else
-    {
-        if (is_on)
-            internal_gram.symbol[byteIndex - 25] |= bitMask;
-        else
-            internal_gram.symbol[byteIndex - 25] &= ~bitMask;
-    }
-}
-
-void BOE_48_1504FN::display_buffer()
+void HUV_13SS16T::display_buffer()
 {
     int64_t current_time = esp_timer_get_time() / 1000;
     if (content_inhibit_time != 0)
@@ -445,7 +442,7 @@ void BOE_48_1504FN::display_buffer()
         }
     }
 }
-void BOE_48_1504FN::scroll_buffer()
+void HUV_13SS16T::scroll_buffer()
 {
     if (cb->length > DISPLAY_SIZE)
     {
@@ -453,7 +450,7 @@ void BOE_48_1504FN::scroll_buffer()
     }
 }
 
-void BOE_48_1504FN::noti_show(const char *str, int timeout)
+void HUV_13SS16T::noti_show(const char *str, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     int str_len = strlen(str);
@@ -490,96 +487,6 @@ void BOE_48_1504FN::noti_show(const char *str, int timeout)
     }
 }
 
-void BOE_48_1504FN::spectrum_show(float *buf, int size)
+void HUV_13SS16T::spectrum_show(float *buf, int size)
 {
-    symbolhelper(LD_0_0, false);
-    symbolhelper(LD_1_0, false);
-    symbolhelper(LD_2_0, false);
-    symbolhelper(LD_3_0, false);
-    symbolhelper(LD_4_0, false);
-    symbolhelper(RD_0_0, false);
-    symbolhelper(RD_1_0, false);
-    symbolhelper(RD_2_0, false);
-    symbolhelper(RD_3_0, false);
-    symbolhelper(RD_4_0, false);
-
-    int fft_level_l = 0, fft_level_r = 0;
-    for (int i = size / 4; i < size * 3 / 4; i++)
-    {
-        if (i % 2)
-            fft_level_l += buf[i];
-        else
-            fft_level_r += buf[i];
-    }
-    fft_level_l /= (size / 4);
-    fft_level_r /= (size / 4);
-
-    if (fft_level_l > 5)
-        symbolhelper(RD_0_0, true);
-    if (fft_level_l > 25)
-        symbolhelper(RD_1_0, true);
-    if (fft_level_l > 45)
-        symbolhelper(RD_2_0, true);
-    if (fft_level_l > 65)
-        symbolhelper(RD_3_0, true);
-    if (fft_level_l > 85)
-        symbolhelper(RD_4_0, true);
-
-    if (fft_level_r > 5)
-        symbolhelper(LD_0_0, true);
-    if (fft_level_r > 25)
-        symbolhelper(LD_1_0, true);
-    if (fft_level_r > 45)
-        symbolhelper(LD_2_0, true);
-    if (fft_level_r > 65)
-        symbolhelper(LD_3_0, true);
-    if (fft_level_r > 85)
-        symbolhelper(LD_4_0, true);
-
-    symbolhelper(L_0_0, false);
-    symbolhelper(L_1_0, false);
-    symbolhelper(R_0_0, false);
-    symbolhelper(R_1_0, false);
-
-    for (size_t i = 0; i < 14; i++)
-    {
-        symbolhelper(bar_L_3[i], false);
-        symbolhelper(bar_L_4[i], false);
-        symbolhelper(bar_R_3[i], false);
-        symbolhelper(bar_R_4[i], false);
-    }
-    int len_single = (size / 28);
-    static int count = 0;
-    for (int i = 0; i < 28; i++)
-    {
-        int level_sum = 0;
-        for (int j = 0; j < len_single; j++)
-        {
-            level_sum += buf[i * len_single + j];
-        }
-        level_sum /= len_single;
-        if (i % 2)
-        {
-            if (level_sum > 10)
-                symbolhelper(L_0_0, true);
-            if (level_sum > 30)
-                symbolhelper(L_1_0, true);
-            if (level_sum > 50)
-                symbolhelper(bar_L_3[(i + count) % 14], true);
-            if (level_sum > 75)
-                symbolhelper(bar_L_4[(i + count) % 14], true);
-        }
-        else
-        {
-            if (level_sum > 10)
-                symbolhelper(R_0_0, true);
-            if (level_sum > 30)
-                symbolhelper(R_1_0, true);
-            if (level_sum > 50)
-                symbolhelper(bar_R_3[(i + count) % 14], true);
-            if (level_sum > 75)
-                symbolhelper(bar_R_4[(i + count) % 14], true);
-        }
-    }
-    count++;
 }

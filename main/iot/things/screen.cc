@@ -63,13 +63,13 @@ namespace iot
 
             methods_.AddMethod("TurnOff", "关闭自动亮度", ParameterList(), [this](const ParameterList &parameters)
                                {
-                                auto backlight = Board::GetInstance().GetBacklight();
+            auto backlight = Board::GetInstance().GetBacklight();
             auto display = Board::GetInstance().GetDisplay();
             display->SetAutoDimming(false);
             char tempstr[11] = {0};
             sprintf(tempstr, "AutoDimmOF");
             display->Notification((std::string)tempstr,2000); 
-            display->SetBacklight(backlight->brightness()); });
+            backlight->SetBrightness(backlight->brightness()); });
         }
     };
 

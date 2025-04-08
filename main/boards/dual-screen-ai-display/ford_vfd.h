@@ -212,7 +212,7 @@ private:
         0x5b  // Z
     };
 
-    SymbolPosition symbolPositions[100] = {
+    const SymbolPosition symbolPositions[100] = {
         {272, 0x20}, // 冒号1
         {816, 0x20}, // 冒号2
         {270, 0x40}, // 点1

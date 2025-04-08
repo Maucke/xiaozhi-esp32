@@ -12,6 +12,7 @@
 #define HNA_16MM65T_EN 0
 #define BOE_48_1504FN_EN 0
 #define FTB_13_BT_247GN_EN 01
+#define HUV_13SS16T_EN 0
 
 // 板子选择
 #define ESP_D103 0

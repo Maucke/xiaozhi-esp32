@@ -72,10 +72,6 @@ PT6302::PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t 
 void PT6302::init()
 {
     write_mode(PT6302::Mode::NORMAL);
-    const uint8_t values[5] = {
-        0, 1, 2, 3, 4};
-    write_dcram(10, (uint8_t *)values, 5);
-    write_grnum(digits);
     write_dimming();
 }
 
@@ -133,6 +129,7 @@ void PT6302::write_dimming()
 
 void PT6302::write_grnum(unsigned int amount)
 {
+    digits = amount;
     uint8_t command = 0x60;
     command |= amount & 0x7;
     write_data8(&command, 1);
@@ -143,21 +140,6 @@ void PT6302::write_mode(Mode mode)
     uint8_t command = 0x70 | (uint8_t)mode;
     write_data8(&command, 1);
     return;
-}
-
-void PT6302::refrash(Gram *gram)
-{
-    if (gram == nullptr)
-        return;
-    write_cgram(0, gram->cgram, 40);
-    write_dcram(0, gram->number, sizeof gram->number);
-    write_adram(0, gram->symbol, sizeof gram->symbol);
-    write_dimming();
-}
-
-void PT6302::refrash()
-{
-    refrash((Gram *)&internal_gram);
 }
 
 void PT6302::setsleep(bool en)

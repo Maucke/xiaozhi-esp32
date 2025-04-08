@@ -1,15 +1,15 @@
 /*
  * Author: 施华锋
  * Date: 2025-02-12
- * Description: This file implements the methods of the BT247GN class for communicating with the BT247GN device via SPI.
+ * Description: This file implements the methods of the FTB_BT_247GN class for communicating with the FTB_BT_247GN device via SPI.
  */
 
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
-#include "bt247gn.h"
+#include "futaba_bt_247gn.h"
 #include "string.h"
 
-#define TAG "BT247GN"
+#define TAG "FTB_BT_247GN"
 // 0x00-0x0D 原始数据，可带最多9*13参数，地址自增
 // 0x20-0x3F 原始点阵数据，bit 4-2:x, bit 0:y 后须带5的倍数数据，地址自增
 // 0x40-0x5F 原始数字数据，bit 4-0:x，地址自增
@@ -18,7 +18,7 @@
 // 0xA0-0xAF 点阵ASCII，bit 4-2:x, bit 0:y ，地址自增
 // 0xB0-0xBF 命令
 // 0xB0 dimming: 0-100
-void BT247GN::write_data8(uint8_t *dat, int len)
+void FTB_BT_247GN::write_data8(uint8_t *dat, int len)
 {
     // Create an SPI transaction structure and initialize it to zero
     spi_transaction_t t;
@@ -42,13 +42,13 @@ void BT247GN::write_data8(uint8_t *dat, int len)
     return;
 }
 
-BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num)
+FTB_BT_247GN::FTB_BT_247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num)
 {
     // Initialize the SPI bus configuration structure
     spi_bus_config_t buscfg = {0};
 
     // Log the initialization process
-    ESP_LOGI(TAG, "Initialize BT247GN SPI bus");
+    ESP_LOGI(TAG, "Initialize FTB_BT_247GN SPI bus");
 
     // Set the clock and data pins for the SPI bus
     buscfg.sclk_io_num = clk;
@@ -68,19 +68,19 @@ BT247GN::BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_
         .queue_size = 7,
     };
 
-    // Add the BT247GN device to the SPI bus with the specified configuration
+    // Add the FTB_BT_247GN device to the SPI bus with the specified configuration
     ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
     init_task();
-    ESP_LOGI(TAG, "BT247GN Initalized");
+    ESP_LOGI(TAG, "FTB_BT_247GN Initalized");
 }
 
-BT247GN::BT247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
+FTB_BT_247GN::FTB_BT_247GN(spi_device_handle_t spi_device) : spi_device_(spi_device)
 {
     init_task();
-    ESP_LOGI(TAG, "BT247GN Initalized");
+    ESP_LOGI(TAG, "FTB_BT_247GN Initalized");
 }
 
-void BT247GN::init_task()
+void FTB_BT_247GN::init_task()
 {
     symbolhelper(Auto, true);
     symbolhelper(Key, true);
@@ -91,7 +91,7 @@ void BT247GN::init_task()
         [](void *arg)
         {
             int count = 0;
-            BT247GN *vfd = static_cast<BT247GN *>(arg);
+            FTB_BT_247GN *vfd = static_cast<FTB_BT_247GN *>(arg);
             while (true)
             {
                 if (!((++count) % 12))
@@ -113,7 +113,7 @@ void BT247GN::init_task()
         nullptr);
 }
 
-void BT247GN::test()
+void FTB_BT_247GN::test()
 {
     static bool face = false;
     for (size_t i = 0; i < sizeof pixel_gram; i++)
@@ -127,14 +127,14 @@ void BT247GN::test()
     refrash();
 }
 
-void BT247GN::setbrightness(uint8_t brightness)
+void FTB_BT_247GN::setbrightness(uint8_t brightness)
 {
     dimming = brightness;
 	if (dimming < 5)
 		dimming = 5;
 }
 
-void BT247GN::setsleep(bool en)
+void FTB_BT_247GN::setsleep(bool en)
 {
     if (en)
     {
@@ -144,7 +144,7 @@ void BT247GN::setsleep(bool en)
     }
 }
 
-void BT247GN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
+void FTB_BT_247GN::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
 {
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     for (size_t i = 0; i < PIXEL_COUNT; i++)
@@ -163,7 +163,7 @@ void BT247GN::noti_show(int start, const char *buf, int size, bool forceupdate, 
     }
 }
 
-void BT247GN::pixel_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+void FTB_BT_247GN::pixel_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
 {
     if (content_inhibit_time != 0)
     {
@@ -185,7 +185,7 @@ void BT247GN::pixel_show(int start, const char *buf, int size, bool forceupdate,
     }
 }
 
-void BT247GN::num_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+void FTB_BT_247GN::num_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
 {
     for (size_t i = 0; i < size && (start + i) < NUM_COUNT; i++)
     {
@@ -196,14 +196,14 @@ void BT247GN::num_show(int start, const char *buf, int size, bool forceupdate, N
     }
 }
 
-const uint8_t *BT247GN::find_pixel_hex_code(char ch)
+const uint8_t *FTB_BT_247GN::find_pixel_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= ('~' + 1))
         return hex_codes[ch - ' '];
     return hex_codes[0];
 }
 
-uint8_t BT247GN::find_num_hex_code(char ch)
+uint8_t FTB_BT_247GN::find_num_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= 'Z')
         return num_hex_codes[ch - ' '];
@@ -212,7 +212,7 @@ uint8_t BT247GN::find_num_hex_code(char ch)
     return 0;
 }
 
-void BT247GN::pixelanimate()
+void FTB_BT_247GN::pixelanimate()
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
     int64_t current_time = esp_timer_get_time() / 1000;
@@ -344,12 +344,12 @@ void BT247GN::pixelanimate()
     }
 }
 
-uint8_t BT247GN::contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask)
+uint8_t FTB_BT_247GN::contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask)
 {
     return (raw & mask) | (before_raw & (~mask));
 }
 
-void BT247GN::numberanimate()
+void FTB_BT_247GN::numberanimate()
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
     int64_t current_time = esp_timer_get_time() / 1000;
@@ -505,29 +505,29 @@ void BT247GN::numberanimate()
         }
     }
 }
-void BT247GN::pixelhelper(int index, uint8_t *code)
+void FTB_BT_247GN::pixelhelper(int index, uint8_t *code)
 {
     memcpy(pixel_gram + index * 5, code, 5);
 }
 
-void BT247GN::numhelper(int index, uint8_t code)
+void FTB_BT_247GN::numhelper(int index, uint8_t code)
 {
     num_gram[index] = code;
 }
 
-void BT247GN::symbolhelper(Symbols icon, bool en)
+void FTB_BT_247GN::symbolhelper(Symbols icon, bool en)
 {
     icon_gram[(int)icon] = en;
 }
 
-void BT247GN::time_blink()
+void FTB_BT_247GN::time_blink()
 {
     static bool time_mark = true;
     time_mark = !time_mark;
     symbolhelper(Colon, time_mark);
 }
 
-void BT247GN::set_fonttype(int index)
+void FTB_BT_247GN::set_fonttype(int index)
 {
 #if USE_MUTI_FONTS
     ESP_LOGI(TAG, "fonttype: %d", index % 6);
@@ -535,7 +535,7 @@ void BT247GN::set_fonttype(int index)
 #endif
 }
 
-void BT247GN::refrash() // origin
+void FTB_BT_247GN::refrash() // origin
 {
     static uint8_t lastdimming = 0;
     if (lastdimming != dimming)
@@ -548,7 +548,7 @@ void BT247GN::refrash() // origin
     icon_write(0, icon_gram, sizeof icon_gram);
 }
 
-void BT247GN::pixel_write(int x, int y, const uint8_t *code, int len)
+void FTB_BT_247GN::pixel_write(int x, int y, const uint8_t *code, int len)
 {
     uint8_t temp_gram[PIXEL_COUNT * 5 + 1];
     temp_gram[0] = 0x20;
@@ -558,7 +558,7 @@ void BT247GN::pixel_write(int x, int y, const uint8_t *code, int len)
     write_data8(temp_gram, len * 5 + 1);
 }
 
-void BT247GN::pixel_write(int x, int y, const char *ascii, int len)
+void FTB_BT_247GN::pixel_write(int x, int y, const char *ascii, int len)
 {
     uint8_t temp_gram[PIXEL_COUNT + 1];
     temp_gram[0] = 0xA0;
@@ -568,7 +568,7 @@ void BT247GN::pixel_write(int x, int y, const char *ascii, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::num_write(int x, const uint8_t *code, int len)
+void FTB_BT_247GN::num_write(int x, const uint8_t *code, int len)
 {
     uint8_t temp_gram[NUM_COUNT + 1];
     temp_gram[0] = 0x40;
@@ -577,7 +577,7 @@ void BT247GN::num_write(int x, const uint8_t *code, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::num_write(int x, const char *ascii, int len)
+void FTB_BT_247GN::num_write(int x, const char *ascii, int len)
 {
     uint8_t temp_gram[NUM_COUNT + 1];
     temp_gram[0] = 0x80;
@@ -586,7 +586,7 @@ void BT247GN::num_write(int x, const char *ascii, int len)
     write_data8(temp_gram, len + 1);
 }
 
-void BT247GN::icon_write(Symbols icon, bool en)
+void FTB_BT_247GN::icon_write(Symbols icon, bool en)
 {
     uint8_t temp_gram[1 + 2];
     temp_gram[0] = 0x60;
@@ -596,7 +596,7 @@ void BT247GN::icon_write(Symbols icon, bool en)
     write_data8(temp_gram, 3);
 }
 
-void BT247GN::icon_write(int x, const uint8_t *code, int len)
+void FTB_BT_247GN::icon_write(int x, const uint8_t *code, int len)
 {
     uint8_t temp_gram[ICON_COUNT + 2];
     temp_gram[0] = 0x60;
@@ -606,7 +606,7 @@ void BT247GN::icon_write(int x, const uint8_t *code, int len)
     write_data8(temp_gram, len + 2);
 }
 
-void BT247GN::dimming_write(int val)
+void FTB_BT_247GN::dimming_write(int val)
 {
     uint8_t temp_gram[2];
     temp_gram[0] = 0xB0;
@@ -615,7 +615,7 @@ void BT247GN::dimming_write(int val)
     write_data8(temp_gram, 2);
 }
 
-void BT247GN::display_buffer()
+void FTB_BT_247GN::display_buffer()
 {
     if (cb->length_top)
     {
@@ -663,7 +663,7 @@ void BT247GN::display_buffer()
         }
     }
 }
-void BT247GN::scroll_buffer()
+void FTB_BT_247GN::scroll_buffer()
 {
     if (cb->length_top > DISPLAY_SIZE)
     {
@@ -675,7 +675,7 @@ void BT247GN::scroll_buffer()
     }
 }
 
-void BT247GN::pixel_show(int y, const char *str)
+void FTB_BT_247GN::pixel_show(int y, const char *str)
 {
     int str_len = strlen(str);
     if (str_len > BUFFER_SIZE)
@@ -738,7 +738,7 @@ void BT247GN::pixel_show(int y, const char *str)
     }
 }
 
-void BT247GN::spectrum_show(float *buf, int size)
+void FTB_BT_247GN::spectrum_show(float *buf, int size)
 {
     symbolhelper(Bar_1, false);
     symbolhelper(Bar_2, false);

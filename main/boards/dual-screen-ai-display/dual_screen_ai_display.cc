@@ -34,9 +34,11 @@
 #elif SUB_DISPLAY_EN && HNA_16MM65T_EN
 #include "hna_16mm65t.h"
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-#include "bt247gn.h"
+#include "futaba_bt_247gn.h"
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
 #include "boe_48_1504fn.h"
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+#include "huv_13ss16t.h"
 #endif
 #include "spectrumdisplay.h"
 #include "mpu6050.h"
@@ -81,11 +83,15 @@ class CustomLcdDisplay : public QspiLcdDisplay
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
     ,
                          public Led,
-                         public BT247GN
+                         public FTB_BT_247GN
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
     ,
                          public Led,
                          public BOE_48_1504FN
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+    ,
+                         public Led,
+                         public HUV_13SS16T
 #endif
 {
 private:
@@ -144,7 +150,10 @@ public:
           BOE_48_1504FN(spidevice)
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
           ,
-          BT247GN(spidevice)
+          FTB_BT_247GN(spidevice)
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+          ,
+          HUV_13SS16T(spidevice)
 #endif
     {
         DisplayLockGuard lock(this);
@@ -653,7 +662,7 @@ public:
 public:
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show(0, (char *)content.c_str(), content.size(), true, BT247GN::UP2DOWN, timeout);
+        noti_show(0, (char *)content.c_str(), content.size(), true, FTB_BT_247GN::UP2DOWN, timeout);
     }
 
     void SetSubSleep(bool en = true)
@@ -798,6 +807,61 @@ public:
             break;
         case kDeviceStateUpgrading:
             symbolhelper(RD_USB, true);
+            break;
+        default:
+            ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
+            return;
+        }
+    }
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+
+#if CONFIG_USE_FFT_EFFECT
+    virtual void SpectrumShow(float *buf, int size) override
+    {
+        spectrum_show(buf, size);
+    }
+#endif
+
+    virtual void Notification(const std::string &content, int timeout = 2000) override
+    {
+        noti_show((char *)content.c_str(), timeout);
+    }
+
+    void SetSubSleep(bool en = true)
+    {
+        setsleep(en);
+    }
+
+    void SetSubBacklight(uint8_t brightness)
+    {
+        setbrightness(brightness);
+    }
+
+    virtual void OnStateChanged() override
+    {
+        auto &app = Application::GetInstance();
+        auto device_state = app.GetDeviceState();
+        switch (device_state)
+        {
+        case kDeviceStateStarting:
+            break;
+        case kDeviceStateWifiConfiguring:
+            break;
+        case kDeviceStateIdle:
+            break;
+        case kDeviceStateConnecting:
+            break;
+        case kDeviceStateListening:
+            if (app.IsVoiceDetected())
+            {
+            }
+            else
+            {
+            }
+            break;
+        case kDeviceStateSpeaking:
+            break;
+        case kDeviceStateUpgrading:
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -979,6 +1043,71 @@ private:
             display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
         else
             display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        static int64_t start_time = esp_timer_get_time() / 1000;
+        int64_t current_time = esp_timer_get_time() / 1000;
+        int64_t elapsed_time = current_time - start_time;
+
+        if (elapsed_time >= 500)
+            start_time = current_time;
+        else
+            return;
+        static int count = 0;
+        if (charging)
+            display_->symbolhelper(FTB_BT_247GN::Usb, true);
+        else
+            display_->symbolhelper(FTB_BT_247GN::Usb, false);
+
+        if (discharging)
+        {
+            display_->symbolhelper(FTB_BT_247GN::Bat_0, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
+            if (battery_level > 0)
+                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
+            if (battery_level > 25)
+            {
+                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
+                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
+            }
+            if (battery_level > 50)
+            {
+                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
+                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
+            }
+            if (battery_level > 75)
+                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
+            count = 0;
+        }
+        else
+        {
+            display_->symbolhelper(FTB_BT_247GN::Bat_0, true);
+            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
+            if (count > 0)
+                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
+            if (count > 1)
+                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
+            if (count > 2)
+                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
+            if (count > 3)
+                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
+            if (count > 4)
+                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
+            if (count > 5)
+                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
+            count++;
+            count = count % 7;
+        }
 #endif
     }
 
@@ -992,6 +1121,8 @@ private:
         display_->symbolhelper(BOE_48_1504FN::SLEEP, true);
         display_->Notification("  sleepy  ", 4000);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        display_->Notification("  sleepy  ", 4000);
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
         display_->Notification("  sleepy  ", 4000);
 #endif
         vTaskDelay(pdMS_TO_TICKS(4000));
@@ -1218,7 +1349,7 @@ private:
 
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
-#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN || HUV_13SS16T)
 
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
@@ -1759,13 +1890,13 @@ public:
         else
             charging = false;
 
-        float voltage = 0.0f, current = 0.0f;
-        for (size_t i = 0; i < 3; i++)
-        {
-            voltage = ina3221->getBusVoltage(i);
-            current = ina3221->getCurrent(i);
-            // ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
-        }
+        // float voltage = 0.0f, current = 0.0f;
+        // for (size_t i = 0; i < 3; i++)
+        // {
+        //     voltage = ina3221->getBusVoltage(i);
+        //     current = ina3221->getCurrent(i);
+        //     ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        // }
 #else
         static int last_level = 0;
         static bool last_charging = false;
@@ -1836,78 +1967,15 @@ public:
         discharging = !charging;
 #endif
 #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        static int64_t start_time = esp_timer_get_time() / 1000;
-        int64_t current_time = esp_timer_get_time() / 1000;
-        int64_t elapsed_time = current_time - start_time;
-
-        if (elapsed_time >= 500)
-            start_time = current_time;
-        else
-            return true;
-        static int count = 0;
         char temp_str[11];
         snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
-        display_->num_show(14, temp_str, 3, BT247GN::ANTICLOCKWISE);
-        if (charging)
-            display_->symbolhelper(BT247GN::Usb, true);
-        else
-            display_->symbolhelper(BT247GN::Usb, false);
-
-        if (discharging)
-        {
-            display_->symbolhelper(BT247GN::Bat_0, false);
-            display_->symbolhelper(BT247GN::Bat_1, false);
-            display_->symbolhelper(BT247GN::Bat_2, false);
-            display_->symbolhelper(BT247GN::Bat_3, false);
-            display_->symbolhelper(BT247GN::Bat_4, false);
-            display_->symbolhelper(BT247GN::Bat_5, false);
-            display_->symbolhelper(BT247GN::Bat_6, false);
-            if (level > 0)
-                display_->symbolhelper(BT247GN::Bat_1, true);
-            if (level > 25)
-            {
-                display_->symbolhelper(BT247GN::Bat_2, true);
-                display_->symbolhelper(BT247GN::Bat_3, true);
-            }
-            if (level > 50)
-            {
-                display_->symbolhelper(BT247GN::Bat_4, true);
-                display_->symbolhelper(BT247GN::Bat_5, true);
-            }
-            if (level > 75)
-                display_->symbolhelper(BT247GN::Bat_6, true);
-            count = 0;
-        }
-        else
-        {
-            display_->symbolhelper(BT247GN::Bat_0, true);
-            display_->symbolhelper(BT247GN::Bat_1, false);
-            display_->symbolhelper(BT247GN::Bat_2, false);
-            display_->symbolhelper(BT247GN::Bat_3, false);
-            display_->symbolhelper(BT247GN::Bat_4, false);
-            display_->symbolhelper(BT247GN::Bat_5, false);
-            display_->symbolhelper(BT247GN::Bat_6, false);
-            if (count > 0)
-                display_->symbolhelper(BT247GN::Bat_1, true);
-            if (count > 1)
-                display_->symbolhelper(BT247GN::Bat_2, true);
-            if (count > 2)
-                display_->symbolhelper(BT247GN::Bat_3, true);
-            if (count > 3)
-                display_->symbolhelper(BT247GN::Bat_4, true);
-            if (count > 4)
-                display_->symbolhelper(BT247GN::Bat_5, true);
-            if (count > 5)
-                display_->symbolhelper(BT247GN::Bat_6, true);
-            count++;
-            count = count % 7;
-        }
+        display_->num_show(14, temp_str, 3, FTB_BT_247GN::ANTICLOCKWISE);
         snprintf(temp_str, sizeof temp_str, "%4d", (int)(GetBarometer()));
-        display_->num_show(3, temp_str, 4, BT247GN::ANTICLOCKWISE);
+        display_->num_show(3, temp_str, 4, FTB_BT_247GN::ANTICLOCKWISE);
 
         snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
-        display_->num_show(18, temp_str, 3, BT247GN::CLOCKWISE);
-        display_->symbolhelper(BT247GN::Point, true);
+        display_->num_show(18, temp_str, 3, FTB_BT_247GN::CLOCKWISE);
+        display_->symbolhelper(FTB_BT_247GN::Point, true);
 #endif
         return true;
     }
@@ -1931,17 +1999,17 @@ public:
 #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         char tempstr[7];
         snprintf(tempstr, sizeof(tempstr), "%d", (bl / 10) % 10);
-        display_->num_show(17, tempstr, 1, BT247GN::ANTICLOCKWISE);
+        display_->num_show(17, tempstr, 1, FTB_BT_247GN::ANTICLOCKWISE);
         if (bl / 100)
-            display_->symbolhelper(BT247GN::L2, true);
+            display_->symbolhelper(FTB_BT_247GN::L2, true);
         else
-            display_->symbolhelper(BT247GN::L2, false);
+            display_->symbolhelper(FTB_BT_247GN::L2, false);
 
 #endif
         if (abs(bl - last_bl) > 10)
         {
             last_bl = bl;
-            GetBacklight()->SetBrightness(bl, false);
+            GetBacklight()->SetBrightness(bl);
             display_->SetSubBacklight(bl);
         }
 
@@ -1985,17 +2053,28 @@ public:
             strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
         blink = !blink;
         display_->content_show(1, time_str, 8, false, BOE_48_1504FN::UP2DOWN);
-
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+        static struct tm time_user;
+        time_t now = time(NULL);
+        time_user = *localtime(&now);
+        char time_str[11];
+        static bool blink = false;
+        if (blink)
+            strftime(time_str, sizeof(time_str), "%H:%M:%S", &time_user);
+        else
+            strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
+        blink = !blink;
+        display_->content_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         static struct tm time_user;
         time_t now = time(NULL);
         time_user = *localtime(&now);
         char time_str[7];
         strftime(time_str, sizeof(time_str), "%H%M%S", &time_user);
-        display_->num_show(8, time_str, 6, BT247GN::ANTICLOCKWISE);
+        display_->num_show(8, time_str, 6, FTB_BT_247GN::ANTICLOCKWISE);
         const char *weekDays[7] = {
             "sun", "mon", "tue", "wed", "thu", "fri", "sat"};
-        display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, false, BT247GN::UP2DOWN);
+        display_->num_show(0, weekDays[time_user.tm_wday % 7], 3, false, FTB_BT_247GN::UP2DOWN);
         display_->time_blink();
 #endif
         return true;

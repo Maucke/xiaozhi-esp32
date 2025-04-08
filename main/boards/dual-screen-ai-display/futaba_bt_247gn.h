@@ -1,11 +1,11 @@
 /*
  * Author: 施华锋
  * Date: 2025-01-16
- * Description: This header file defines the BT247GN class for communicating with the BT247GN device via SPI.
+ * Description: This header file defines the FTB_BT_247GN class for communicating with the FTB_BT_247GN device via SPI.
  */
 
-#ifndef _BT247GN_H_
-#define _BT247GN_H_
+#ifndef _FTB_BT_247GN_H_
+#define _FTB_BT_247GN_H_
 
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
@@ -39,12 +39,12 @@
 //     return 0;
 // }
 /**
- * @class BT247GN
- * @brief A class for interacting with the BT247GN device using SPI communication.
+ * @class FTB_BT_247GN
+ * @brief A class for interacting with the FTB_BT_247GN device using SPI communication.
  *
- * This class provides methods to initialize the BT247GN device, write data to it, and refresh its display.
+ * This class provides methods to initialize the FTB_BT_247GN device, write data to it, and refresh its display.
  */
-class BT247GN
+class FTB_BT_247GN
 {
 public:
 #define PIXEL_COUNT (20)
@@ -803,8 +803,8 @@ public:
         int length_bottom;
     } CircularBuffer;
 
-    BT247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
-    BT247GN(spi_device_handle_t spi_device);
+    FTB_BT_247GN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
+    FTB_BT_247GN(spi_device_handle_t spi_device);
     void test();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
