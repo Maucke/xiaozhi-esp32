@@ -155,6 +155,14 @@ QspiLcdDisplay::QspiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
     {
         lv_display_set_offset(display_, offset_x, offset_y);
     }
+    // Update the theme
+    if (current_theme_name_ == "dark") {
+        current_theme = DARK_THEME;
+    } else if (current_theme_name_ == "light") {
+        current_theme = LIGHT_THEME;
+    }
+
+    SetupUI();
 }
 
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,

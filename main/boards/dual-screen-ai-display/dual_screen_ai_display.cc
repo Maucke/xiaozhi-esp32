@@ -157,7 +157,7 @@ public:
     {
         DisplayLockGuard lock(this);
 
-        SetupUI();
+        // SetupUI();
         // 由于屏幕是带圆角的，所以状态栏需要增加左右内边距
         // lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.1, 0);
         // lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES * 0.1, 0);
@@ -201,130 +201,7 @@ public:
     {
         lv_obj_set_height((lv_obj_t *)var, v);
     }
-
-    static void btn_clicked_cb(lv_event_t *e)
-    {
-        auto &app = Application::GetInstance();
-        app.ToggleChatState();
-    }
-
 #define BTNWIDTH 150
-    void SetupUI()
-    {
-        DisplayLockGuard lock(this);
-
-        ESP_LOGI(TAG, "SetupUI");
-        auto screen = lv_disp_get_scr_act(lv_disp_get_default());
-        lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
-        lv_obj_set_style_text_font(screen, &font_puhui_16_4, 0);
-        lv_obj_set_style_text_color(screen, lv_color_white(), 0);
-
-        /* Container */
-        container_ = lv_obj_create(screen);
-        lv_obj_set_size(container_, LV_HOR_RES - BTNWIDTH, LV_VER_RES);
-        lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_all(container_, 0, 0);
-        lv_obj_set_style_pad_right(container_, 5, 0);
-        lv_obj_set_style_border_width(container_, 0, 0);
-        lv_obj_set_style_pad_row(container_, 0, 0);
-        lv_obj_set_style_bg_color(container_, lv_color_black(), 0);
-
-        /* Status bar */
-        status_bar_ = lv_obj_create(container_);
-        lv_obj_set_size(status_bar_, LV_HOR_RES - BTNWIDTH - 5, 18 + 2);
-        lv_obj_set_style_radius(status_bar_, 0, 0);
-        lv_obj_set_style_bg_color(status_bar_, lv_color_black(), 0);
-
-        /* Status bar */
-        lv_obj_set_flex_flow(status_bar_, LV_FLEX_FLOW_ROW);
-        lv_obj_set_style_pad_all(status_bar_, 0, 0);
-        lv_obj_set_style_border_width(status_bar_, 0, 0);
-        lv_obj_set_style_pad_column(status_bar_, 4, 0);
-
-        /* Content */
-        content_ = lv_obj_create(container_);
-        lv_obj_set_style_radius(content_, 0, 0);
-        lv_obj_set_size(content_, LV_HOR_RES - BTNWIDTH - 5, LV_VER_RES - (18 + 2));
-        lv_obj_set_flex_grow(content_, 1);
-        lv_obj_set_style_bg_color(content_, lv_color_black(), 0);
-
-        /* Content */
-        lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
-        lv_obj_set_style_pad_all(content_, 0, 0);
-        lv_obj_set_style_border_width(content_, 0, 0);
-        lv_obj_add_flag(content_, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_scroll_dir(content_, LV_DIR_VER);
-        lv_obj_set_scrollbar_mode(content_, LV_SCROLLBAR_MODE_ACTIVE);
-
-        network_label_ = lv_label_create(status_bar_);
-        lv_label_set_text(network_label_, "");
-        lv_obj_set_style_text_font(network_label_, &font_awesome_16_4, 0);
-
-        notification_label_ = lv_label_create(status_bar_);
-        lv_obj_set_flex_grow(notification_label_, 1);
-        lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_text(notification_label_, "通知");
-        lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
-
-        status_label_ = lv_label_create(status_bar_);
-        lv_obj_set_flex_grow(status_label_, 1);
-        lv_label_set_text(status_label_, "正在初始化");
-        lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
-
-        emotion_label_ = lv_label_create(status_bar_);
-        lv_obj_set_style_text_font(emotion_label_, &font_awesome_16_4, 0);
-        lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
-        lv_obj_center(emotion_label_);
-
-        mute_label_ = lv_label_create(status_bar_);
-        lv_label_set_text(mute_label_, "");
-        lv_obj_set_style_text_font(mute_label_, &font_awesome_16_4, 0);
-
-        battery_label_ = lv_label_create(status_bar_);
-
-        lv_label_set_text(battery_label_, "");
-        lv_obj_set_style_text_font(battery_label_, &font_awesome_16_4, 0);
-
-        lv_style_init(&style_user);
-        lv_style_set_radius(&style_user, 5);
-        lv_style_set_bg_opa(&style_user, LV_OPA_COVER);
-        lv_style_set_border_width(&style_user, 2);
-        lv_style_set_border_color(&style_user, lv_color_hex(0));
-        lv_style_set_pad_all(&style_user, 10);
-
-        lv_style_set_text_color(&style_user, lv_color_hex(0xffffff));
-        lv_style_set_bg_color(&style_user, lv_color_hex(0x00B050));
-
-        lv_style_init(&style_assistant);
-        lv_style_set_radius(&style_assistant, 5);
-        lv_style_set_bg_opa(&style_assistant, LV_OPA_COVER);
-        lv_style_set_border_width(&style_assistant, 2);
-        lv_style_set_border_color(&style_assistant, lv_color_hex(0));
-        lv_style_set_pad_all(&style_assistant, 10);
-
-        lv_style_set_text_color(&style_assistant, lv_color_hex(0));
-        lv_style_set_bg_color(&style_assistant, lv_color_hex(0xE0E0E0));
-
-        lv_obj_t *btncontainer_ = lv_obj_create(screen);
-        lv_obj_set_size(btncontainer_, BTNWIDTH, LV_VER_RES);
-        lv_obj_set_style_pad_all(btncontainer_, 0, 0);
-        lv_obj_set_style_pad_left(btncontainer_, 5, 0);
-        lv_obj_align(btncontainer_, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_set_style_border_width(btncontainer_, 0, 0);
-        lv_obj_set_style_bg_color(btncontainer_, lv_color_black(), 0);
-
-        lv_obj_t *btn = lv_obj_create(btncontainer_);
-        lv_obj_set_size(btn, BTNWIDTH - 5, LV_VER_RES);
-        lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_GREY), 0);
-        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-        lv_obj_t *mic_label = lv_label_create(btn);
-        lv_label_set_text(mic_label, "AI");
-        lv_obj_set_style_text_font(mic_label, &font_puhui_16_4, 0);
-        lv_obj_center(mic_label);
-
-        lv_obj_add_event_cb(btn, btn_clicked_cb, LV_EVENT_CLICKED, NULL);
-    }
     virtual void SetChatMessage(const char *role, const char *content) override
     {
         if (content != nullptr && *content == '\0')
@@ -336,83 +213,7 @@ public:
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
         SetSubContent(content);
 #endif
-        // std::stringstream ss;
-        // ss << "role: " << role << ", content: " << content << std::endl;
-        // std::string logMessage = ss.str();
-        // auto sdcard = Board::GetInstance().GetSdcard();
-        // sdcard->Write("/sdcard/log.txt", logMessage.c_str());
-        // ESP_LOGI(TAG, "%s", logMessage.c_str());
-
-        // ESP_LOGI(TAG, "%X %X", content[0], content[1]);
-        DisplayLockGuard lock(this);
-        if (labelContainer.size() >= 10)
-        {
-            RemoveOldestLabel(); // 当 label 数量达到 10 时移除最早的
-        }
-        lv_obj_t *container = lv_obj_create(content_);
-        lv_obj_set_style_bg_color(container, lv_color_black(), 0);
-        lv_obj_set_scrollbar_mode(container, LV_SCROLLBAR_MODE_OFF);
-        lv_obj_set_style_radius(container, 0, 0);
-        lv_obj_set_style_border_width(container, 0, 0);
-        lv_obj_set_width(container, LV_HOR_RES - BTNWIDTH - 5 - 2);
-        lv_obj_set_style_pad_all(container, 0, 0);
-
-        lv_obj_t *label = lv_label_create(container);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-
-        if (strcmp(role, "user") == 0)
-        {
-            lv_obj_add_style(label, &style_user, 0);
-            lv_obj_align(label, LV_ALIGN_RIGHT_MID, 0, 0);
-        }
-        else
-        {
-            lv_obj_add_style(label, &style_assistant, 0);
-            lv_obj_align(label, LV_ALIGN_LEFT_MID, 0, 0);
-        }
-        lv_obj_set_style_text_font(label, &font_puhui_16_4, 0);
-        lv_label_set_text(label, content);
-        // lv_obj_center(label);
-
-        lv_obj_set_style_pad_all(label, 5, LV_PART_MAIN);
-
-        lv_obj_update_layout(label);
-        // ESP_LOGI(TAG, "Label Width: %ld-%ld", lv_obj_get_width(label), (LV_HOR_RES -BTNWIDTH - 5 - 2));
-        if (lv_obj_get_width(label) >= (LV_HOR_RES - BTNWIDTH - 5 - 2))
-            lv_obj_set_width(label, (LV_HOR_RES - BTNWIDTH - 5 - 2));
-        lv_obj_scroll_to_view(container, LV_ANIM_ON);
-
-        for (size_t i = 0; i < 2; i++)
-        {
-            lv_anim_init(&anim[i]);
-            lv_anim_set_var(&anim[i], label);
-            lv_anim_set_early_apply(&anim[i], false);
-            lv_anim_set_path_cb(&anim[i], lv_anim_path_overshoot);
-            lv_anim_set_time(&anim[i], 300);
-            lv_anim_set_delay(&anim[i], 200);
-        }
-        lv_anim_set_values(&anim[0], 0, lv_obj_get_width(label));
-        lv_anim_set_exec_cb(&anim[0], (lv_anim_exec_xcb_t)set_width);
-        lv_anim_start(&anim[0]);
-
-        lv_anim_set_values(&anim[1], 0, lv_obj_get_height(label));
-        lv_anim_set_exec_cb(&anim[1], (lv_anim_exec_xcb_t)set_height);
-        lv_anim_start(&anim[1]);
-
-        lv_obj_set_width(label, 0);
-        lv_obj_set_height(label, 0);
-
-        lv_anim_init(&anim[2]);
-        lv_anim_set_var(&anim[2], container);
-        lv_anim_set_early_apply(&anim[2], true);
-        lv_anim_set_path_cb(&anim[2], lv_anim_path_overshoot);
-        lv_anim_set_time(&anim[2], 200);
-        lv_anim_set_values(&anim[2], 0, lv_obj_get_height(label));
-        lv_anim_set_exec_cb(&anim[2], (lv_anim_exec_xcb_t)set_height);
-        lv_anim_start(&anim[2]);
-
-        labelContainer.push_back(container);
-        lv_obj_update_layout(content_);
+        QspiLcdDisplay::SetChatMessage(role, content);
     }
 
 #if SUB_DISPLAY_EN && FORD_VFD_EN
@@ -1271,6 +1072,8 @@ private:
 
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
     {
+        // auto &app = Application::GetInstance();
+        // app.ToggleChatState();
     }
 
     void InitializeDisplay()
@@ -1629,7 +1432,7 @@ public:
 
         InitializeAdc();
         InitializeI2c();
-        test();
+        // test();
 #if ESP_DUAL_DISPLAY_V2
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
