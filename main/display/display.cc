@@ -55,7 +55,8 @@ Display::Display()
 
     // Create a power management lock
     auto ret = esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "display_update", &pm_lock_);
-    if (ret == ESP_ERR_NOT_SUPPORTED) {
+    if (ret == ESP_ERR_NOT_SUPPORTED)
+    {
         ESP_LOGI(TAG, "Power management not supported");
     }
     else
@@ -159,9 +160,11 @@ void Display::Update()
     // 更新电池图标
     int battery_level;
     bool charging, discharging;
-    const char* icon = nullptr;
-    if (board.GetBatteryLevel(battery_level, charging, discharging)) {
-        if (charging) {
+    const char *icon = nullptr;
+    if (board.GetBatteryLevel(battery_level, charging, discharging))
+    {
+        if (charging)
+        {
             icon = FONT_AWESOME_BATTERY_CHARGING;
         }
         else
@@ -183,16 +186,22 @@ void Display::Update()
             lv_label_set_text(battery_label_, battery_icon_);
         }
 
-        if (low_battery_popup_ != nullptr) {
-            if (strcmp(icon, FONT_AWESOME_BATTERY_EMPTY) == 0 && discharging) {
-                if (lv_obj_has_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN)) { // 如果低电量提示框隐藏，则显示
+        if (low_battery_popup_ != nullptr)
+        {
+            if (strcmp(icon, FONT_AWESOME_BATTERY_EMPTY) == 0 && discharging)
+            {
+                if (lv_obj_has_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN))
+                { // 如果低电量提示框隐藏，则显示
                     lv_obj_clear_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
-                    auto& app = Application::GetInstance();
+                    auto &app = Application::GetInstance();
                     app.PlaySound(Lang::Sounds::P3_LOW_BATTERY);
                 }
-            } else {
+            }
+            else
+            {
                 // Hide the low battery popup when the battery is not empty
-                if (!lv_obj_has_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN)) { // 如果低电量提示框显示，则隐藏
+                if (!lv_obj_has_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN))
+                { // 如果低电量提示框显示，则隐藏
                     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
                 }
             }
@@ -305,8 +314,12 @@ void Display::Notification(const std::string &content, int timeout)
 {
 }
 
-void Display::SetTheme(const std::string& theme_name) {
+void Display::SetTheme(const std::string &theme_name, bool permanent)
+{
     current_theme_name_ = theme_name;
-    Settings settings("display", true);
-    settings.SetString("theme", theme_name);
+    if (permanent)
+    {
+        Settings settings("display", true);
+        settings.SetString("theme", theme_name);
+    }
 }

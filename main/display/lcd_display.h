@@ -47,7 +47,7 @@ public:
 #endif  
 
     // Add theme switching function
-    virtual void SetTheme(const std::string& theme_name) override;
+    virtual void SetTheme(const std::string& theme_name, bool permanent = true) override;
 };
 
 // RGB LCD显示器

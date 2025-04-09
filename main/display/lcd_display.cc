@@ -799,7 +799,7 @@ void LcdDisplay::SetIcon(const char *icon)
     lv_label_set_text(emotion_label_, icon);
 }
 
-void LcdDisplay::SetTheme(const std::string& theme_name) {
+void LcdDisplay::SetTheme(const std::string& theme_name, bool permanent) {
     DisplayLockGuard lock(this);
     
     if (theme_name == "dark" || theme_name == "DARK") {
@@ -989,5 +989,5 @@ void LcdDisplay::SetTheme(const std::string& theme_name) {
     }
 
     // No errors occurred. Save theme to settings
-    Display::SetTheme(theme_name);
+    Display::SetTheme(theme_name, permanent);
 }

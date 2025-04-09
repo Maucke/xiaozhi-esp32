@@ -871,6 +871,13 @@ private:
 
 #if ESP_DUAL_DISPLAY_V2
         pcf8574 = new PCF8574(i2c_bus);
+        pcf8574->writeGpio(TPS_PS, 1);
+        pcf8574->writeGpio(MIC_EN, 1);
+        pcf8574->writeGpio(OLED_EN, 1);
+        pcf8574->writeGpio(VFD_EN, 0);
+        pcf8574->writeGpio(SD_EN, 1);
+        vTaskDelay(pdMS_TO_TICKS(120));
+        pcf8574->writeGpio(VFD_EN, 1);
         ina3221 = new INA3221(i2c_bus);
         ESP_LOGD(TAG, "ina3221 begin: %d", ina3221->begin());
         float voltage = 0.0f, current = 0.0f;
@@ -1182,7 +1189,42 @@ private:
         };
         ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&dimm_cali_config, &dimm_adc_cali_handle));
     }
-    void GetWakeupCause(void)
+
+    void InitializeTimeSync()
+    {
+        xTaskCreate([](void *arg)
+                    { sntp_set_time_sync_notification_cb([](struct timeval *t) {
+                if (settimeofday(t, NULL) == ESP_FAIL) {
+                    ESP_LOGE(TAG, "Failed to set system time");
+                    return;
+                }
+                struct tm tm_info;
+                localtime_r(&t->tv_sec, &tm_info);
+                char time_str[50];
+                strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
+
+                ESP_LOGD(TAG, "The net time is: %s", time_str);
+                auto ret = Board::GetInstance().CalibrateTime(&tm_info);
+                if(!ret)
+                    ESP_LOGI(TAG, "Calibration Time Failed");
+                    else
+                    {
+                        CustomLcdDisplay *display = (CustomLcdDisplay*)Board::GetInstance().GetDisplay();
+                        if(display != nullptr)
+                            display->Notification("SYNC TM OK", 3000);
+                        } 
+                    });
+        esp_netif_init();
+        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, (char *)NTP_SERVER1);
+        esp_sntp_setservername(1, (char *)NTP_SERVER2);
+        esp_sntp_init();
+        setenv("TZ", DEFAULT_TIMEZONE, 1);
+        tzset();
+        vTaskDelete(NULL); }, "timesync", 4096, NULL, 4, nullptr);
+    }
+
+    void GetWakeupCause()
     {
         esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
         switch (wakeup_cause)
@@ -1277,47 +1319,7 @@ public:
         InitializeAdc();
         InitializeI2c();
         // test();
-#if ESP_DUAL_DISPLAY_V2
-        pcf8574->writeGpio(TPS_PS, 1);
-        pcf8574->writeGpio(MIC_EN, 1);
-        pcf8574->writeGpio(OLED_EN, 1);
-        pcf8574->writeGpio(VFD_EN, 0);
-        pcf8574->writeGpio(SD_EN, 1);
-        vTaskDelay(pdMS_TO_TICKS(120));
-        pcf8574->writeGpio(VFD_EN, 1);
-#endif
-
-        xTaskCreate([](void *arg)
-                    { sntp_set_time_sync_notification_cb([](struct timeval *t) {
-                if (settimeofday(t, NULL) == ESP_FAIL) {
-                    ESP_LOGE(TAG, "Failed to set system time");
-                    return;
-                }
-                struct tm tm_info;
-                localtime_r(&t->tv_sec, &tm_info);
-                char time_str[50];
-                strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
-
-                ESP_LOGD(TAG, "The net time is: %s", time_str);
-                auto ret = Board::GetInstance().CalibrateTime(&tm_info);
-                if(!ret)
-                    ESP_LOGI(TAG, "Calibration Time Failed");
-                    else
-                    {
-                        CustomLcdDisplay *display = (CustomLcdDisplay*)Board::GetInstance().GetDisplay();
-                        if(display != nullptr)
-                            display->Notification("SYNC TM OK", 3000);
-                        } 
-                    });
-        esp_netif_init();
-        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-        esp_sntp_setservername(0, (char *)NTP_SERVER1);
-        esp_sntp_setservername(1, (char *)NTP_SERVER2);
-        esp_sntp_init();
-        setenv("TZ", DEFAULT_TIMEZONE, 1);
-        tzset();
-        vTaskDelete(NULL); }, "timesync", 4096, NULL, 4, nullptr);
-
+        InitializeTimeSync();
         InitializeDisplay();
         InitializeIot();
         GetBacklight()->RestoreBrightness();
@@ -1613,11 +1615,11 @@ public:
         discharging = !charging;
 #endif
         power_save_timer_->SetEnabled(discharging);
-        if(discharging)
+        if (discharging)
         {
             bool active;
             mpu6050_getMotionInterruptStatus(mpu6050, &active);
-            if(active)
+            if (active)
             {
                 power_save_timer_->WakeUp();
                 // ESP_LOGI(TAG, "WakeUp");
@@ -1758,6 +1760,10 @@ public:
         {
             last_bl = bl;
             GetBacklight()->SetBrightness(bl);
+            if (bl > 80)
+                display_->SetTheme("light", false);
+            else if (bl < 40)
+                display_->SetTheme("dark", false);
         }
 
         return true;

@@ -38,7 +38,7 @@ public:
 #endif
     virtual void DrawPoint(int x, int y, uint8_t dot) {}
     virtual std::string GetTheme() { return current_theme_name_; }
-    virtual void SetTheme(const std::string& theme_name);
+    virtual void SetTheme(const std::string& theme_name, bool permanent = true);
 
     void SetAutoDimming(bool en)
     {
