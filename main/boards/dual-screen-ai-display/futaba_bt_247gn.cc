@@ -84,7 +84,6 @@ void FTB_BT_247GN::init_task()
 {
     symbolhelper(Auto, true);
     symbolhelper(Key, true);
-    symbolhelper(All, true);
     symbolhelper(TempO, true);
     symbolhelper(Lock, true);
     xTaskCreate(

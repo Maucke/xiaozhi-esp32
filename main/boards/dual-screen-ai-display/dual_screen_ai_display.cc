@@ -45,6 +45,7 @@
 #include "ina3221.h"
 #include "pcf8574.h"
 #include "physics.h"
+#include "power_save_timer.h"
 
 #define TAG "DualScreenAIDisplay"
 
@@ -94,29 +95,10 @@ class CustomLcdDisplay : public QspiLcdDisplay
 #endif
 {
 private:
-    uint8_t brightness_ = 0;
-    lv_style_t style_user;
-    lv_style_t style_assistant;
-    std::vector<lv_obj_t *> labelContainer; // 存储 label 指针的容器
-    lv_anim_t anim[3];
-
 #if SUB_DISPLAY_EN && FORD_VFD_EN
     lv_display_t *subdisplay;
     lv_obj_t *sub_status_label_;
 #endif
-
-    void RemoveOldestLabel()
-    {
-        if (!labelContainer.empty())
-        {
-            lv_obj_t *oldestLabel = labelContainer.front();
-            labelContainer.erase(labelContainer.begin()); // 从容器中移除最早的 label 指针
-
-            lv_obj_t *label = lv_obj_get_child(oldestLabel, 0);
-            lv_obj_del(label);
-            lv_obj_del(oldestLabel); // 删除 lvgl 对象
-        }
-    }
 
 public:
     CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle,
@@ -156,12 +138,6 @@ public:
 #endif
     {
         DisplayLockGuard lock(this);
-
-        // SetupUI();
-        // 由于屏幕是带圆角的，所以状态栏需要增加左右内边距
-        // lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.1, 0);
-        // lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES * 0.1, 0);
-
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         InitializeSubScreen();
         SetupSubUI();
@@ -192,15 +168,6 @@ public:
 #endif
     }
 
-    static void set_width(void *var, int32_t v)
-    {
-        lv_obj_set_width((lv_obj_t *)var, v);
-    }
-
-    static void set_height(void *var, int32_t v)
-    {
-        lv_obj_set_height((lv_obj_t *)var, v);
-    }
 #define BTNWIDTH 150
     virtual void SetChatMessage(const char *role, const char *content) override
     {
@@ -303,16 +270,6 @@ public:
     void SetSubContent(const char *content)
     {
         DisplayLockGuard lock(this);
-        // lv_anim_t *anim;
-        // lv_anim_init(anim);
-        // lv_anim_set_var(anim, sub_status_label_);
-        // lv_anim_set_early_apply(anim, false);
-        // lv_anim_set_path_cb(anim, lv_anim_path_overshoot);
-        // lv_anim_set_time(anim, 300);
-        // lv_anim_set_values(anim, 0, lv_obj_get_x(sub_status_label_));
-        // lv_anim_set_exec_cb(anim, (lv_anim_exec_xcb_t)set_width);
-        // lv_anim_start(anim);
-
         lv_label_set_text(sub_status_label_, content);
     }
 
@@ -366,6 +323,7 @@ public:
         auto &app = Application::GetInstance();
         auto device_state = app.GetDeviceState();
         symbolhelper(DAB, false);
+        symbolhelper(FM, false);
         symbolhelper(BT, false);
         symbolhelper(TA, false);
         symbolhelper(CD0, false);
@@ -377,7 +335,7 @@ public:
         switch (device_state)
         {
         case kDeviceStateStarting:
-            symbolhelper(DAB, true);
+            symbolhelper(FM, true);
             break;
         case kDeviceStateWifiConfiguring:
             symbolhelper(BT, true);
@@ -407,6 +365,9 @@ public:
             break;
         case kDeviceStateUpgrading:
             symbolhelper(UDISK, true);
+            break;
+        case kDeviceStateActivating:
+            symbolhelper(DAB, true);
             break;
         default:
             setmode(FORD_VFD::CONTENT);
@@ -487,6 +448,7 @@ public:
         symbolhelper(Pause, false);
         symbolhelper(Play, false);
         symbolhelper(Cd, false);
+        symbolhelper(All, false);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -518,6 +480,9 @@ public:
             break;
         case kDeviceStateUpgrading:
             symbolhelper(Cd, true);
+            break;
+        case kDeviceStateActivating:
+            symbolhelper(All, true);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -570,7 +535,6 @@ public:
         symbolhelper(RD_MIC, false);
         symbolhelper(RD_USB, false);
         symbolhelper(PLAY, false);
-        symbolhelper(D_OUTLINE_3, true);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -607,6 +571,9 @@ public:
             break;
         case kDeviceStateUpgrading:
             symbolhelper(RD_USB, true);
+            break;
+        case kDeviceStateActivating:
+            symbolhelper(D_OUTLINE_3, true);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -663,6 +630,8 @@ public:
             break;
         case kDeviceStateUpgrading:
             break;
+        case kDeviceStateActivating:
+            break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
             return;
@@ -690,6 +659,7 @@ public:
         symbolhelper(REC_2, false);
         symbolhelper(USB1, false);
         dotshelper(DOT_MATRIX_FILL);
+        symbolhelper(LBAR_RBAR, false);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -719,6 +689,9 @@ public:
             break;
         case kDeviceStateUpgrading:
             symbolhelper(USB1, true);
+            break;
+        case kDeviceStateActivating:
+            symbolhelper(LBAR_RBAR, true);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -752,226 +725,85 @@ private:
     rx8900_handle_t rx8900 = NULL;
     mpu6050_handle_t mpu6050 = NULL;
     esp_lcd_panel_io_handle_t panel_io_ = NULL;
+    PowerSaveTimer *power_save_timer_;
 #if ESP_DUAL_DISPLAY_V2
     PCF8574 *pcf8574 = NULL;
     INA3221 *ina3221 = NULL;
 #endif
-
-    esp_timer_handle_t power_save_timer_ = nullptr;
-    bool show_low_power_warning_ = false;
-    bool sleep_mode_enabled_ = false;
-    int power_save_ticks_ = 0;
-
-    const int POWER_SAVE_TIMER_PERIOD_SECONDS = 1;
-    const int SECONDS_TO_SLEEP = 120;
-
     void InitializePowerSaveTimer()
     {
-        esp_timer_create_args_t power_save_timer_args = {
-            .callback = [](void *arg)
-            {
-                auto board = static_cast<DualScreenAIDisplay *>(arg);
-                board->PowerSaveCheck();
-            },
-            .arg = this,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "power_save_timer",
-            .skip_unhandled_events = false,
-        };
-        ESP_ERROR_CHECK(esp_timer_create(&power_save_timer_args, &power_save_timer_));
-        ESP_ERROR_CHECK(esp_timer_start_periodic(power_save_timer_, POWER_SAVE_TIMER_PERIOD_SECONDS * 1000000));
-    }
-
-    void PowerSaveCheck()
-    {
-        auto &app = Application::GetInstance();
-        if (app.GetDeviceState() != kDeviceStateIdle)
-        {
-            power_save_ticks_ = 0;
-            return;
-        }
-
-        int battery_level;
-        bool charging, discharging;
-        GetBatteryLevel(battery_level, charging, discharging);
-        if (discharging)
-        {
-            if (battery_level == 0)
-            {
-                ESP_LOGI(TAG, "Battery too low, Deep sleep, MPU sleep");
-                app.Alert(Lang::Strings::WARNING, Lang::Strings::BATTERY_LOW, "sad", Lang::Sounds::P3_VIBRATION);
-                show_low_power_warning_ = true;
-                Sleep();
-            }
-
-            power_save_ticks_++;
-            if (power_save_ticks_ >= SECONDS_TO_SLEEP)
-            {
-                ESP_LOGI(TAG, "Timeout, Deep sleep, MPU aslo sleep");
-                Sleep();
-            }
-        }
-        else
-        {
-            if (show_low_power_warning_)
-            {
-                app.DismissAlert();
-                show_low_power_warning_ = false;
-            }
-        }
-#if SUB_DISPLAY_EN && FORD_VFD_EN
-        if (!charging)
-            display_->symbolhelper(FORD_VFD::AUX, false);
-        else
-            display_->symbolhelper(FORD_VFD::AUX, true);
-#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
-        if (discharging)
-            display_->symbolhelper(HNA_16MM65T::USB2, false);
-        else
-            display_->symbolhelper(HNA_16MM65T::USB2, true);
-#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
-        if (discharging)
-            display_->symbolhelper(BOE_48_1504FN::RD_BAT, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::RD_BAT, false);
-
-        if (charging)
-            display_->symbolhelper(BOE_48_1504FN::D_USB, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::D_USB, false);
-        if (!discharging && !charging)
-            display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
-        else
-            display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
-#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
-#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        static int64_t start_time = esp_timer_get_time() / 1000;
-        int64_t current_time = esp_timer_get_time() / 1000;
-        int64_t elapsed_time = current_time - start_time;
-
-        if (elapsed_time >= 500)
-            start_time = current_time;
-        else
-            return;
-        static int count = 0;
-        if (charging)
-            display_->symbolhelper(FTB_BT_247GN::Usb, true);
-        else
-            display_->symbolhelper(FTB_BT_247GN::Usb, false);
-
-        if (discharging)
-        {
-            display_->symbolhelper(FTB_BT_247GN::Bat_0, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
-            if (battery_level > 0)
-                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
-            if (battery_level > 25)
-            {
-                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
-                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
-            }
-            if (battery_level > 50)
-            {
-                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
-                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
-            }
-            if (battery_level > 75)
-                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
-            count = 0;
-        }
-        else
-        {
-            display_->symbolhelper(FTB_BT_247GN::Bat_0, true);
-            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
-            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
-            if (count > 0)
-                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
-            if (count > 1)
-                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
-            if (count > 2)
-                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
-            if (count > 3)
-                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
-            if (count > 4)
-                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
-            if (count > 5)
-                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
-            count++;
-            count = count % 7;
-        }
-#endif
-    }
-
-    void Sleep() override
-    {
-        display_->SetChatMessage("system", "sleepy");
+        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
+        power_save_timer_->OnEnterSleepMode([this]()
+                                            {
+        ESP_LOGI(TAG, "Enabling sleep mode");
+        display_->SetChatMessage("system", "");
         display_->SetEmotion("sleepy");
 #if SUB_DISPLAY_EN && HNA_16MM65T_EN
-        display_->Notification("  sleepy  ", 4000);
+                display_->Notification("  sleepy  ", 4000);
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
-        display_->symbolhelper(BOE_48_1504FN::SLEEP, true);
-        display_->Notification("  sleepy  ", 4000);
+                display_->symbolhelper(BOE_48_1504FN::SLEEP, true);
+                display_->Notification("  sleepy  ", 4000);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-        display_->Notification("  sleepy  ", 4000);
+                display_->Notification("  sleepy  ", 4000);
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN
-        display_->Notification("  sleepy  ", 4000);
+                display_->Notification("  sleepy  ", 4000);
 #endif
-        vTaskDelay(pdMS_TO_TICKS(4000));
+        GetBacklight()->SetBrightness(1); });
+        power_save_timer_->OnExitSleepMode([this]()
+                                           {
+        display_->SetChatMessage("system", "");
+        display_->SetEmotion("neutral");
+        GetBacklight()->RestoreBrightness(); });
+        power_save_timer_->OnShutdownRequest([this]()
+                                             {
+        ESP_LOGI(TAG, "Shutting down");
 #if ESP_DUAL_DISPLAY_V2
-        pcf8574->writeGpio(MIC_EN, 0);
-        pcf8574->writeGpio(OLED_EN, 0);
-        pcf8574->writeGpio(VFD_EN, 0);
-        pcf8574->writeGpio(SD_EN, 0);
-        pcf8574->writeGpio(TPS_PS, 0);
+                pcf8574->writeGpio(MIC_EN, 0);
+                pcf8574->writeGpio(OLED_EN, 0);
+                pcf8574->writeGpio(VFD_EN, 0);
+                pcf8574->writeGpio(SD_EN, 0);
+                pcf8574->writeGpio(TPS_PS, 0);
 #endif
-        bool active;
-        mpu6050_enable_motiondetection(mpu6050, 1, 20);
-        mpu6050_getMotionInterruptStatus(mpu6050, &active);
-        mpu6050_sleep(mpu6050); // deactive the mpu, because its lost power to fast
-        GetBacklight()->SetBrightness(0);
-        display_->SetSubBacklight(0);
-        display_->SetSleep(true);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
-        {
-            ESP_LOGI(TAG, "Disable amoled power");
-            gpio_set_level(PIN_NUM_LCD_POWER, 0);
-        }
-
-        if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
-        {
-            ESP_LOGI(TAG, "Disable VFD power");
-            gpio_set_level(PIN_NUM_VFD_EN, 0);
-        }
-
-        if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
-        {
-            ESP_LOGI(TAG, "Disable force power");
-            gpio_set_level(PIN_NUM_POWER_EN, 0);
-        }
-        i2c_bus_delete(&i2c_bus);
+                bool active;
+                mpu6050_enable_motiondetection(mpu6050, 1, 20);
+                mpu6050_getMotionInterruptStatus(mpu6050, &active);
+                mpu6050_sleep(mpu6050); // deactive the mpu, because its lost power to fast
+                GetBacklight()->SetBrightness(0);
+                display_->SetSubBacklight(0);
+                display_->SetSleep(true);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable amoled power");
+                    gpio_set_level(PIN_NUM_LCD_POWER, 0);
+                }
+        
+                if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable VFD power");
+                    gpio_set_level(PIN_NUM_VFD_EN, 0);
+                }
+        
+                if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable force power");
+                    gpio_set_level(PIN_NUM_POWER_EN, 0);
+                }
+                i2c_bus_delete(&i2c_bus);
 #if ESP_DUAL_DISPLAY_V2
-        rtc_gpio_pullup_en(TOUCH_INT_NUM);
-        rtc_gpio_pullup_en(WAKE_INT_NUM);
-        esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
-        // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
-        // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
+                rtc_gpio_pullup_en(TOUCH_INT_NUM);
+                rtc_gpio_pullup_en(WAKE_INT_NUM);
+                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+            // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
+            // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
 #else
-        rtc_gpio_pullup_en(TOUCH_INT_NUM);
-        esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+                rtc_gpio_pullup_en(TOUCH_INT_NUM);
+                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
 #endif
-        // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
-        // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
-        esp_deep_sleep_start();
+                // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+                // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
+                esp_deep_sleep_start(); });
+        power_save_timer_->SetEnabled(true);
     }
 
     void InitializeI2c()
@@ -1475,8 +1307,9 @@ public:
         vTaskDelete(NULL); }, "timesync", 4096, NULL, 4, nullptr);
 
         InitializeDisplay();
-        InitializePowerSaveTimer();
         InitializeIot();
+        GetBacklight()->RestoreBrightness();
+        InitializePowerSaveTimer();
         GetWakeupCause();
         GetSdcard();
         InitializeButtons();
@@ -1692,6 +1525,14 @@ public:
         else
             charging = false;
 
+        if (discharging)
+        {
+            power_save_timer_->SetEnabled(true);
+        }
+        else
+        {
+            power_save_timer_->SetEnabled(false);
+        }
         // float voltage = 0.0f, current = 0.0f;
         // for (size_t i = 0; i < 3; i++)
         // {
@@ -1778,6 +1619,97 @@ public:
         snprintf(temp_str, sizeof temp_str, "%3d", (int)(GetTemperature() * 10));
         display_->num_show(18, temp_str, 3, FTB_BT_247GN::CLOCKWISE);
         display_->symbolhelper(FTB_BT_247GN::Point, true);
+#endif
+
+#if SUB_DISPLAY_EN && FORD_VFD_EN
+        if (!charging)
+            display_->symbolhelper(FORD_VFD::AUX, false);
+        else
+            display_->symbolhelper(FORD_VFD::AUX, true);
+#elif SUB_DISPLAY_EN && HNA_16MM65T_EN
+        if (discharging)
+            display_->symbolhelper(HNA_16MM65T::USB2, false);
+        else
+            display_->symbolhelper(HNA_16MM65T::USB2, true);
+#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+        if (discharging)
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::RD_BAT, false);
+
+        if (charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB, false);
+        if (!discharging && !charging)
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, true);
+        else
+            display_->symbolhelper(BOE_48_1504FN::D_USB_L, false);
+#elif SUB_DISPLAY_EN && HUV_13SS16T_EN
+#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+        static int64_t start_time = esp_timer_get_time() / 1000;
+        int64_t current_time = esp_timer_get_time() / 1000;
+        int64_t elapsed_time = current_time - start_time;
+
+        if (elapsed_time >= 500)
+            start_time = current_time;
+        else
+            return true;
+        static int count = 0;
+        if (charging)
+            display_->symbolhelper(FTB_BT_247GN::Usb, true);
+        else
+            display_->symbolhelper(FTB_BT_247GN::Usb, false);
+
+        if (discharging)
+        {
+            display_->symbolhelper(FTB_BT_247GN::Bat_0, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
+            if (level > 0)
+                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
+            if (level > 25)
+            {
+                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
+                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
+            }
+            if (level > 50)
+            {
+                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
+                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
+            }
+            if (level > 75)
+                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
+            count = 0;
+        }
+        else
+        {
+            display_->symbolhelper(FTB_BT_247GN::Bat_0, true);
+            display_->symbolhelper(FTB_BT_247GN::Bat_1, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_2, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_3, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_4, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_5, false);
+            display_->symbolhelper(FTB_BT_247GN::Bat_6, false);
+            if (count > 0)
+                display_->symbolhelper(FTB_BT_247GN::Bat_1, true);
+            if (count > 1)
+                display_->symbolhelper(FTB_BT_247GN::Bat_2, true);
+            if (count > 2)
+                display_->symbolhelper(FTB_BT_247GN::Bat_3, true);
+            if (count > 3)
+                display_->symbolhelper(FTB_BT_247GN::Bat_4, true);
+            if (count > 4)
+                display_->symbolhelper(FTB_BT_247GN::Bat_5, true);
+            if (count > 5)
+                display_->symbolhelper(FTB_BT_247GN::Bat_6, true);
+            count++;
+            count = count % 7;
+        }
 #endif
         return true;
     }
