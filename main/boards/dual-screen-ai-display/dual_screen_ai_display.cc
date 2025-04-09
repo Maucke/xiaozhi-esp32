@@ -351,7 +351,7 @@ public:
         switch (device_state)
         {
         case kDeviceStateStarting:
-            symbolhelper(FM, true);
+            symbolhelper(DAB, true);
             break;
         case kDeviceStateWifiConfiguring:
             symbolhelper(BT, true);
@@ -383,7 +383,7 @@ public:
             symbolhelper(UDISK, true);
             break;
         case kDeviceStateActivating:
-            symbolhelper(DAB, true);
+            symbolhelper(FM, true);
             break;
         default:
             setmode(FORD_VFD::CONTENT);
@@ -547,10 +547,11 @@ public:
         symbolhelper(D_OUTLINE_0, false);
         symbolhelper(D_OUTLINE_1, false);
         symbolhelper(D_OUTLINE_2, false);
-        symbolhelper(D_OUTLINE_3, false);
+        symbolhelper(D_OUTLINE_3, true);
         symbolhelper(RD_MIC, false);
         symbolhelper(RD_USB, false);
         symbolhelper(PLAY, false);
+        symbolhelper(D_DIVX, false);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -589,7 +590,7 @@ public:
             symbolhelper(RD_USB, true);
             break;
         case kDeviceStateActivating:
-            symbolhelper(D_OUTLINE_3, true);
+            symbolhelper(D_DIVX, true);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -675,7 +676,6 @@ public:
         symbolhelper(REC_2, false);
         symbolhelper(USB1, false);
         dotshelper(DOT_MATRIX_FILL);
-        symbolhelper(LBAR_RBAR, false);
         switch (device_state)
         {
         case kDeviceStateStarting:
@@ -707,7 +707,7 @@ public:
             symbolhelper(USB1, true);
             break;
         case kDeviceStateActivating:
-            symbolhelper(LBAR_RBAR, true);
+            dotshelper(DOT_MATRIX_UP);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -926,8 +926,11 @@ private:
 
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
     {
-        // auto &app = Application::GetInstance();
-        // app.ToggleChatState();
+        auto &app = Application::GetInstance();
+        auto device_state = app.GetDeviceState();
+        ESP_LOGI(TAG, "device_state: %d", device_state);
+        if (device_state == kDeviceStateSpeaking)
+            app.ToggleChatState();
     }
 
     void InitializeDisplay()

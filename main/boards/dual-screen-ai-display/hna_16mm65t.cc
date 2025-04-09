@@ -315,6 +315,7 @@ void HNA_16MM65T::init_task()
         [](void *arg)
         {
             HNA_16MM65T *vfd = static_cast<HNA_16MM65T *>(arg);
+            vfd->symbolhelper(LBAR_RBAR, true);
             while (true)
             {
                 vfd->refrash(vfd->internal_gram);
