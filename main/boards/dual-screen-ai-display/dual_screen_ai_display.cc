@@ -54,6 +54,7 @@ LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(font_puhui_14_1);
 
 #define LCD_BIT_PER_PIXEL (16)
+#define LCD_OPCODE_WRITE_CMD (0x02ULL)
 
 #define LCD_OPCODE_READ_CMD (0x03ULL)
 #define LCD_OPCODE_WRITE_COLOR (0x32ULL)
@@ -71,7 +72,7 @@ static const sh8601_lcd_init_cmd_t vendor_specific_init[] = {
     {0x51, (uint8_t[]){0x00}, 1, 0},
 };
 
-class CustomLcdDisplay : public QspiLcdDisplay
+class CustomLcdDisplay : public QspiLcdDisplay, public Backlight
 #if SUB_DISPLAY_EN && FORD_VFD_EN
     ,
                          public Led,
@@ -144,8 +145,24 @@ public:
 #endif
     }
 
+    void SetBrightnessImpl(uint8_t brightness) override
+    {
+        // ESP_LOGI(TAG, "brightness: %d", brightness);
+#if SUB_DISPLAY_EN
+        SetSubBacklight(brightness);
+#endif
+        DisplayLockGuard lock(this);
+        uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
+        int lcd_cmd = 0x51;
+        lcd_cmd &= 0xff;
+        lcd_cmd <<= 8;
+        lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
+        esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
+    }
+
     void SetSleep(bool en)
     {
+        DisplayLockGuard lock(this);
         ESP_LOGI(TAG, "LCD sleep");
         uint8_t data[1] = {1};
         int lcd_cmd = 0x10;
@@ -168,7 +185,6 @@ public:
 #endif
     }
 
-#define BTNWIDTH 150
     virtual void SetChatMessage(const char *role, const char *content) override
     {
         if (content != nullptr && *content == '\0')
@@ -764,12 +780,8 @@ private:
                 pcf8574->writeGpio(SD_EN, 0);
                 pcf8574->writeGpio(TPS_PS, 0);
 #endif
-                bool active;
-                mpu6050_enable_motiondetection(mpu6050, 1, 20);
-                mpu6050_getMotionInterruptStatus(mpu6050, &active);
                 mpu6050_sleep(mpu6050); // deactive the mpu, because its lost power to fast
                 GetBacklight()->SetBrightness(0);
-                display_->SetSubBacklight(0);
                 display_->SetSleep(true);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
@@ -793,7 +805,8 @@ private:
 #if ESP_DUAL_DISPLAY_V2
                 rtc_gpio_pullup_en(TOUCH_INT_NUM);
                 rtc_gpio_pullup_en(WAKE_INT_NUM);
-                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+                rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM) | (1 << TOUCH_BUTTON_GPIO), ESP_EXT1_WAKEUP_ANY_LOW);
             // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
             // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
 #else
@@ -854,6 +867,7 @@ private:
 
         mpu6050 = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
         ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050));
+        mpu6050_enable_motiondetection(mpu6050, 5, 20);
 
 #if ESP_DUAL_DISPLAY_V2
         pcf8574 = new PCF8574(i2c_bus);
@@ -895,6 +909,7 @@ private:
 
         touch_button_->OnClick([this]()
                                {
+            power_save_timer_->WakeUp();
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
@@ -1107,7 +1122,6 @@ private:
                                         DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
                                         DISPLAY_SWAP_XY, spi_device);
         GetBacklight()->SetBrightness(0);
-        display_->SetSubBacklight(0);
 
         if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
         {
@@ -1213,8 +1227,6 @@ private:
     {
         mpu6050_acce_value_t acce_value;
         physics_init();
-
-        float ax = 1, ay = 0, az = 0;
         while (1)
         {
             printf("\033[2J\033[H");
@@ -1369,8 +1381,7 @@ public:
 
     virtual Backlight *GetBacklight() override
     {
-        static OledBacklight backlight(panel_io_);
-        return &backlight;
+        return display_;
     }
 
     Sdcard *GetSdcard()
@@ -1525,14 +1536,6 @@ public:
         else
             charging = false;
 
-        if (discharging)
-        {
-            power_save_timer_->SetEnabled(true);
-        }
-        else
-        {
-            power_save_timer_->SetEnabled(false);
-        }
         // float voltage = 0.0f, current = 0.0f;
         // for (size_t i = 0; i < 3; i++)
         // {
@@ -1609,6 +1612,17 @@ public:
         }
         discharging = !charging;
 #endif
+        power_save_timer_->SetEnabled(discharging);
+        if(discharging)
+        {
+            bool active;
+            mpu6050_getMotionInterruptStatus(mpu6050, &active);
+            if(active)
+            {
+                power_save_timer_->WakeUp();
+                // ESP_LOGI(TAG, "WakeUp");
+            }
+        }
 #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         char temp_str[11];
         snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
@@ -1744,7 +1758,6 @@ public:
         {
             last_bl = bl;
             GetBacklight()->SetBrightness(bl);
-            display_->SetSubBacklight(bl);
         }
 
         return true;

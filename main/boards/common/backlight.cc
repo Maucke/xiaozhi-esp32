@@ -119,20 +119,3 @@ void PwmBacklight::SetBrightnessImpl(uint8_t brightness) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
-
-OledBacklight::OledBacklight(esp_lcd_panel_io_handle_t panel_io) : Backlight() {
-    panel_io_ = panel_io;
-}
-
-OledBacklight::~OledBacklight() {
-}
-
-void OledBacklight::SetBrightnessImpl(uint8_t brightness) {
-    uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
-    int lcd_cmd = 0x51;
-    lcd_cmd &= 0xff;
-    lcd_cmd <<= 8;
-    lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
-    esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-}
-

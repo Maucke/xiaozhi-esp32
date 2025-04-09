@@ -232,7 +232,7 @@
 #define TOUCH_SWAP_XY true
 #endif
 #define ADC_UNIT ADC_UNIT_1
-#define BAT_ADC_CHANNEL ADC_CHANNEL_1  // GPIO_NUM_2
+// #define BAT_ADC_CHANNEL ADC_CHANNEL_1  // GPIO_NUM_2
 #define DIMM_ADC_CHANNEL ADC_CHANNEL_0 // GPIO_NUM_1
 #define DEFAULT_VREF 1100              // 参考电压，单位为 mV，可根据实际情况调整
 

@@ -35,15 +35,3 @@ public:
 
     void SetBrightnessImpl(uint8_t brightness) override;
 };
-
-class OledBacklight : public Backlight
-{
-#define LCD_OPCODE_WRITE_CMD (0x02ULL)
-    esp_lcd_panel_io_handle_t panel_io_;
-
-public:
-    OledBacklight(esp_lcd_panel_io_handle_t panel_io);
-    ~OledBacklight();
-
-    void SetBrightnessImpl(uint8_t brightness) override;
-};
