@@ -94,10 +94,10 @@ void HUV_13SS16T::draw_point(int x, int y, uint8_t dot)
 
 void HUV_13SS16T::init_task()
 {
+    write_grnum(GR_COUNT);
     const uint8_t values[5] = {
         0, 1, 2, 3, 4};
     write_dcram(0, (uint8_t *)values, 5);
-    write_grnum(GR_COUNT);
     // noti_show("Test long string present: 0123456789", 5000);
     memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
     memset(internal_gram.cgram, 0, sizeof internal_gram.cgram);
@@ -109,6 +109,16 @@ void HUV_13SS16T::init_task()
     {
         currentContentData[i].animation_index = -1;
         tempContentData[i].animation_index = -1;
+    }
+    for (size_t i = 0; i < MAX_X; i++)
+    {
+        for (size_t j = 0; j < MAX_Y; j++)
+        {
+            if ((i + j) % 2)
+                draw_point(i, j, 1);
+            else
+                draw_point(i, j, 0);
+        }
     }
 
     refrash(&internal_gram);
