@@ -34,8 +34,12 @@ namespace iot
                                {
             std::string theme_name = static_cast<std::string>(parameters["theme_name"].string());
             auto display = Board::GetInstance().GetDisplay();
+            auto backlight = Board::GetInstance().GetBacklight();
             if (display) {
+                display->SetAutoDimming(false);
                 display->SetTheme(theme_name);
+                backlight->SetBrightness(backlight->brightness()); 
+                display->Notification("Theme" + theme_name, 2000); 
             } });
 
             methods_.AddMethod("SetBrightness", "设置亮度", ParameterList({Parameter("brightness", "0到100之间的整数", kValueTypeNumber, true)}), [this](const ParameterList &parameters)
@@ -45,6 +49,7 @@ namespace iot
             auto display = Board::GetInstance().GetDisplay();
             if (backlight) {
                 backlight->SetBrightness(brightness, true);
+                display->Notification("Dimm:" + brightness, 2000); 
                 display->SetAutoDimming(false);
             } });
 

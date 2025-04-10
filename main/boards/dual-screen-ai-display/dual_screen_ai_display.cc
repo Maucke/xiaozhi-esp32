@@ -1325,7 +1325,8 @@ public:
         InitializeTimeSync();
         InitializeDisplay();
         InitializeIot();
-        GetBacklight()->RestoreBrightness();
+        if (!display_->GetAutoDimming())
+            GetBacklight()->RestoreBrightness();
         InitializePowerSaveTimer();
         GetWakeupCause();
         GetSdcard();
