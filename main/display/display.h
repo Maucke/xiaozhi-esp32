@@ -38,16 +38,29 @@ public:
 #endif
     virtual void DrawPoint(int x, int y, uint8_t dot) {}
     virtual std::string GetTheme() { return current_theme_name_; }
-    virtual void SetTheme(const std::string& theme_name, bool permanent = true);
+    virtual void SetTheme(const std::string &theme_name, bool permanent = true);
 
-    void SetAutoDimming(bool en)
+    void SetAutoDimming(bool en, bool permanent = true)
     {
-        Settings settings("display", true);
-        settings.SetInt("auto", en);
+        if (permanent)
+        {
+            Settings settings("display", true);
+            settings.SetInt("auto", en);
+        }
         autoDimming_ = en;
     }
 
-    bool GetAutoDimming() { return autoDimming_; }
+    bool GetAutoDimming()
+    {
+        return autoDimming_;
+    }
+
+    void RestoreAutoDimming()
+    {
+        Settings settings("display", false);
+        autoDimming_ = settings.GetInt("auto", 0);
+        SetAutoDimming(autoDimming_, false);
+    }
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -69,7 +82,7 @@ protected:
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t *chat_message_label_ = nullptr;
-    lv_obj_t* low_battery_popup_ = nullptr;
+    lv_obj_t *low_battery_popup_ = nullptr;
     const char *battery_icon_ = nullptr;
     const char *network_icon_ = nullptr;
     bool muted_ = false;
@@ -104,9 +117,11 @@ private:
     Display *display_;
 };
 
-class NoDisplay : public Display {
+class NoDisplay : public Display
+{
 private:
-    virtual bool Lock(int timeout_ms = 0) override {
+    virtual bool Lock(int timeout_ms = 0) override
+    {
         return true;
     }
     virtual void Unlock() override {}

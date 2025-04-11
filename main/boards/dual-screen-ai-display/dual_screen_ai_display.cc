@@ -764,12 +764,15 @@ private:
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN
                 display_->Notification("  sleepy  ", 4000);
 #endif
+        display_->SetAutoDimming(false, false);   
         GetBacklight()->SetBrightness(1); });
         power_save_timer_->OnExitSleepMode([this]()
                                            {
         display_->SetChatMessage("system", "");
         display_->SetEmotion("neutral");
-        GetBacklight()->RestoreBrightness(); });
+        display_->RestoreAutoDimming();
+        if(!display_->GetAutoDimming())
+            GetBacklight()->RestoreBrightness(); });
         power_save_timer_->OnShutdownRequest([this]()
                                              {
         ESP_LOGI(TAG, "Shutting down");
