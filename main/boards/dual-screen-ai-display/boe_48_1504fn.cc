@@ -57,10 +57,10 @@ void BOE_48_1504FN::refrash(Gram *gram)
 
 void BOE_48_1504FN::init_task()
 {
+    write_grnum(GR_COUNT);
     const uint8_t values[5] = {
         0, 1, 2, 3, 4};
     write_dcram(10, (uint8_t *)values, 5);
-    write_grnum(GR_COUNT);
     // noti_show("Test long string present: 0123456789", 5000);
     memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
     memset(internal_gram.cgram, 0, sizeof internal_gram.cgram);

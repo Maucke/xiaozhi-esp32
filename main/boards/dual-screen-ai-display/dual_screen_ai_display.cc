@@ -929,11 +929,11 @@ private:
 
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
     {
-        auto &app = Application::GetInstance();
-        auto device_state = app.GetDeviceState();
-        ESP_LOGI(TAG, "device_state: %d", device_state);
-        if (device_state == kDeviceStateSpeaking)
-            app.ToggleChatState();
+        // auto &app = Application::GetInstance();
+        // auto device_state = app.GetDeviceState();
+        // ESP_LOGI(TAG, "device_state: %d", device_state);
+        // if (device_state == kDeviceStateSpeaking)
+        //     app.ToggleChatState();
     }
 
     void InitializeDisplay()
@@ -1011,7 +1011,7 @@ private:
 
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
-#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN || HUV_13SS16T)
+#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN || HUV_13SS16T_EN)
 
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
