@@ -1,7 +1,12 @@
+#include "config.h"
 #include "wifi_board.h"
 #include "display/lcd_display.h"
+#if AMOLED_191
 #include "esp_lcd_sh8601.h"
 #include "esp_lcd_touch_ft5x06.h"
+#elif AMOLED_095
+#include "esp_lcd_panel_st7789.h"
+#endif
 #include "font_awesome_symbols.h"
 #include "audio_codecs/no_audio_codec.h"
 #include <esp_sleep.h>
@@ -11,7 +16,6 @@
 #include "button.h"
 #include <sstream>
 #include "led/single_led.h"
-#include "config.h"
 #include "iot/thing_manager.h"
 
 #include <wifi_station.h>
@@ -53,6 +57,7 @@ LV_FONT_DECLARE(font_awesome_16_4);
 LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(font_puhui_14_1);
 
+#if AMOLED_191
 #define LCD_BIT_PER_PIXEL (16)
 #define LCD_OPCODE_WRITE_CMD (0x02ULL)
 
@@ -71,8 +76,50 @@ static const sh8601_lcd_init_cmd_t vendor_specific_init[] = {
     {0x29, (uint8_t[]){0x00}, 0, 10},
     {0x51, (uint8_t[]){0x00}, 1, 0},
 };
+#elif AMOLED_095
+#define LCD_BIT_PER_PIXEL (16)
+#define LCD_OPCODE_WRITE_CMD (0x02ULL)
 
-class CustomLcdDisplay : public QspiLcdDisplay, public Backlight
+#define LCD_OPCODE_READ_CMD (0x03ULL)
+#define LCD_OPCODE_WRITE_COLOR (0x32ULL)
+
+typedef struct
+{
+    int cmd;               /*<! The specific LCD command */
+    const void *data;      /*<! Buffer that holds the command specific data */
+    size_t data_bytes;     /*<! Size of `data` in memory, in bytes */
+    unsigned int delay_ms; /*<! Delay in milliseconds after this command */
+} st7796_lcd_init_cmd_t;
+
+typedef struct
+{
+    const st7796_lcd_init_cmd_t *init_cmds; /*!< Pointer to initialization commands array. Set to NULL if using default commands.
+                                             *   The array should be declared as `static const` and positioned outside the function.
+                                             *   Please refer to `vendor_specific_init_default` in source file.
+                                             */
+    uint16_t init_cmds_size;                /*<! Number of commands in above array */
+} st7796_vendor_config_t;
+
+st7796_lcd_init_cmd_t st7796_lcd_init_cmds[] = {
+    {0x11, (uint8_t[]){0x00}, 0, 120},
+    // {0x44, (uint8_t []){0x01, 0xD1}, 2, 0},
+    // {0x35, (uint8_t []){0x00}, 1, 0},
+    {0x34, (uint8_t[]){0x00}, 0, 0},
+    {0x36, (uint8_t[]){0xF0}, 1, 0},
+    {0x3A, (uint8_t[]){0x55}, 1, 0}, // 16bits-RGB565
+    {0x2A, (uint8_t[]){0x00, 0x00, 0x02, 0x17}, 4, 0},
+    {0x2B, (uint8_t[]){0x00, 0x00, 0x00, 0xEF}, 4, 0},
+    {0x29, (uint8_t[]){0x00}, 0, 10},
+    {0x51, (uint8_t[]){0x00}, 1, 0},
+};
+#endif
+
+class CustomLcdDisplay : public Backlight,
+#if AMOLED_191
+                         public QspiLcdDisplay
+#elif AMOLED_095
+                         public SpiLcdDisplay
+#endif
 #if SUB_DISPLAY_EN && FORD_VFD_EN
     ,
                          public Led,
@@ -113,6 +160,7 @@ public:
                      bool mirror_y,
                      bool swap_xy,
                      spi_device_handle_t spidevice = nullptr)
+#if AMOLED_191
         : QspiLcdDisplay(io_handle, panel_handle,
                          width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy,
                          {
@@ -121,6 +169,16 @@ public:
                              .emoji_font = font_emoji_32_init(),
                          },
                          tp_handle)
+#elif AMOLED_095
+        : SpiLcdDisplay(io_handle, panel_handle,
+                        width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy,
+                        {
+                            .text_font = &font_puhui_16_4,
+                            .icon_font = &font_awesome_16_4,
+                            .emoji_font = font_emoji_32_init(),
+                        },
+                        tp_handle)
+#endif
 #if SUB_DISPLAY_EN && FORD_VFD_EN
           ,
           FORD_VFD(spidevice)
@@ -128,14 +186,14 @@ public:
           ,
           HNA_16MM65T(spidevice)
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
-          ,
-          BOE_48_1504FN(spidevice)
+        ,
+        BOE_48_1504FN(spidevice)
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
-          ,
-          FTB_BT_247GN(spidevice)
+        ,
+        FTB_BT_247GN(spidevice)
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN
-          ,
-          HUV_13SS16T(spidevice)
+        ,
+        HUV_13SS16T(spidevice)
 #endif
     {
         DisplayLockGuard lock(this);
@@ -196,7 +254,12 @@ public:
 #elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
         SetSubContent(content);
 #endif
+
+#if AMOLED_191
         QspiLcdDisplay::SetChatMessage(role, content);
+#elif AMOLED_095
+        SpiLcdDisplay::SetChatMessage(role, content);
+#endif
     }
 
 #if SUB_DISPLAY_EN && FORD_VFD_EN
@@ -1036,7 +1099,8 @@ private:
         vTaskDelay(pdMS_TO_TICKS(120));
         pcf8574->writeGpio(OLED_RST, 1);
 #endif
-        ESP_LOGI(TAG, "Initialize OLED SPI bus");
+#if AMOLED_191
+        ESP_LOGI(TAG, "Initialize OLED QSPI bus");
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
         buscfg.data0_io_num = PIN_NUM_LCD_DATA0;
         buscfg.data1_io_num = PIN_NUM_LCD_DATA1;
@@ -1129,6 +1193,57 @@ private:
         ESP_LOGI(TAG, "Initialize touch controller");
         (esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, &tp)); // The first initial will be failed
         (esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, &tp));
+#endif
+#elif AMOLED_095
+        ESP_LOGI(TAG, "Initialize OLED SPI bus");
+        buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
+        buscfg.data0_io_num = PIN_NUM_LCD_DATA0;
+        buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
+        ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+        esp_lcd_panel_io_handle_t panel_io = nullptr;
+        esp_lcd_panel_handle_t panel = nullptr;
+        // 液晶屏控制IO初始化
+        ESP_LOGD(TAG, "Install panel IO");
+        esp_lcd_panel_io_spi_config_t io_config = {};
+        io_config.cs_gpio_num = PIN_NUM_LCD_CS;
+        io_config.dc_gpio_num = PIN_NUM_LCD_DATA2;
+        io_config.spi_mode = 0;
+        io_config.pclk_hz = 40 * 1000 * 1000;
+        io_config.trans_queue_depth = 10;
+        io_config.lcd_cmd_bits = 8;
+        io_config.lcd_param_bits = 8;
+
+        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(LCD_HOST, &io_config, &panel_io));
+
+        // 初始化液晶屏驱动芯片
+        ESP_LOGD(TAG, "Install LCD driver");
+        st7796_vendor_config_t vendor_config = {
+            .init_cmds = st7796_lcd_init_cmds,
+            .init_cmds_size = sizeof(st7796_lcd_init_cmds) / sizeof(st7796_lcd_init_cmd_t),
+        };
+
+        const esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = PIN_NUM_LCD_RST,
+            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+            .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
+            .bits_per_pixel = LCD_BIT_PER_PIXEL,
+            .flags = {
+                .reset_active_high = 0,
+            },
+            .vendor_config = &vendor_config,
+        };
+        ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io, &panel_config, &panel));
+        panel_io_ = panel_io;
+        ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
+        ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+        esp_lcd_panel_invert_color(panel, false);
+        esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
+        esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+        esp_lcd_panel_disp_on_off(panel, true);
+
+        esp_lcd_touch_handle_t tp = nullptr;
+
 #endif
         display_ = new CustomLcdDisplay(panel_io, panel, tp,
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,

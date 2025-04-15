@@ -19,6 +19,9 @@
 #define ESP_DUAL_DISPLAY 0
 #define ESP_DUAL_DISPLAY_V2 01
 
+#define AMOLED_095 01
+#define AMOLED_191 0
+
 #if ESP_D103
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
 
@@ -244,7 +247,7 @@
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 
-#define BUILTIN_LED_GPIO GPIO_NUM_1 
+#define BUILTIN_LED_GPIO GPIO_NUM_1
 // #define BOOT_BUTTON_GPIO GPIO_NUM_0 // 以适配
 // #define RESET_NVS_BUTTON_GPIO     GPIO_NUM_1
 // #define RESET_FACTORY_BUTTON_GPIO GPIO_NUM_4
@@ -290,7 +293,7 @@ enum DectectCH
 #define PIN_NUM_LCD_PCLK (GPIO_NUM_5)
 #define PIN_NUM_LCD_DATA0 (GPIO_NUM_6)
 #define PIN_NUM_LCD_DATA1 (GPIO_NUM_7)
-#define PIN_NUM_LCD_DATA2 (GPIO_NUM_15)
+#define PIN_NUM_LCD_DATA2 (GPIO_NUM_15) // dc
 #define PIN_NUM_LCD_DATA3 (GPIO_NUM_16)
 #define PIN_NUM_LCD_RST (GPIO_NUM_NC) // follow the pcf8574
 #define PIN_NUM_LCD_TE (GPIO_NUM_NC)
