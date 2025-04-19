@@ -1,13 +1,14 @@
-#ifndef _ES8388_AUDIO_CODEC_H
-#define _ES8388_AUDIO_CODEC_H
+#ifndef _ES8374_AUDIO_CODEC_H
+#define _ES8374_AUDIO_CODEC_H
 
 #include "audio_codec.h"
 
-#include <driver/i2c_master.h>
+#include <driver/i2c.h>
+#include <driver/gpio.h>
 #include <esp_codec_dev.h>
 #include <esp_codec_dev_defaults.h>
 
-class Es8388AudioCodec : public AudioCodec {
+class Es8374AudioCodec : public AudioCodec {
 private:
     const audio_codec_data_if_t* data_if_ = nullptr;
     const audio_codec_ctrl_if_t* ctrl_if_ = nullptr;
@@ -24,14 +25,14 @@ private:
     virtual int Write(const int16_t* data, int samples) override;
 
 public:
-    Es8388AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
+    Es8374AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
         gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
-        gpio_num_t pa_pin, uint8_t es8388_addr);
-    virtual ~Es8388AudioCodec();
+        gpio_num_t pa_pin, uint8_t es8374_addr, bool use_mclk = true);
+    virtual ~Es8374AudioCodec();
 
     virtual void SetOutputVolume(int volume) override;
     virtual void EnableInput(bool enable) override;
     virtual void EnableOutput(bool enable) override;
 };
 
-#endif // _ES8388_AUDIO_CODEC_H
+#endif // _ES8374_AUDIO_CODEC_H

@@ -81,10 +81,12 @@ protected:
     lv_obj_t *notification_label_ = nullptr;
     lv_obj_t *mute_label_ = nullptr;
     lv_obj_t *battery_label_ = nullptr;
-    lv_obj_t *chat_message_label_ = nullptr;
-    lv_obj_t *low_battery_popup_ = nullptr;
-    const char *battery_icon_ = nullptr;
-    const char *network_icon_ = nullptr;
+    lv_obj_t* chat_message_label_ = nullptr;
+    lv_obj_t* low_battery_popup_ = nullptr;
+    lv_obj_t* low_battery_label_ = nullptr;
+    
+    const char* battery_icon_ = nullptr;
+    const char* network_icon_ = nullptr;
     bool muted_ = false;
     std::string current_theme_name_;
 
@@ -101,10 +103,8 @@ protected:
 class DisplayLockGuard
 {
 public:
-    DisplayLockGuard(Display *display) : display_(display)
-    {
-        if (!display_->Lock(3000))
-        {
+    DisplayLockGuard(Display *display) : display_(display) {
+        if (!display_->Lock(30000)) {
             ESP_LOGE("Display", "Failed to lock display");
         }
     }
