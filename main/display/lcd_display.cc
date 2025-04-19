@@ -197,7 +197,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         .io_handle = panel_io_,
         .panel_handle = panel_,
         .control_handle = nullptr,
-        .buffer_size = static_cast<uint32_t>(width_ * 10),
+        .buffer_size = static_cast<uint32_t>(width_*height_*30),
         .double_buffer = false,
         .trans_size = 0,
         .hres = static_cast<uint32_t>(width_),
@@ -210,15 +210,15 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         },
         .color_format = LV_COLOR_FORMAT_RGB565,
         .flags = {
-            .buff_dma = 1,
-            .buff_spiram = 0,
+            .buff_dma = 0,
+            .buff_spiram = 1,
             .sw_rotate = 0,
             .swap_bytes = 1,
             .full_refresh = 0,
             .direct_mode = 0,
         },
-    };
 
+    };
     display_ = lvgl_port_add_disp(&display_cfg);
     if (display_ == nullptr)
     {

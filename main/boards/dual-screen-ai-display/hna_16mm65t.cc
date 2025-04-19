@@ -1,5 +1,4 @@
 #include "hna_16mm65t.h"
-#include "driver/usb_serial_jtag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
@@ -490,36 +489,6 @@ void HNA_16MM65T::test()
         this,
         5,
         nullptr);
-}
-
-/**
- * @brief Calibration function that configures the USB SERIAL JTAG and processes received data.
- *
- * Configures the USB SERIAL JTAG driver and allocates a buffer for receiving data.
- * Reads the received data in a loop, parses the data, and updates the display buffer.
- */
-void HNA_16MM65T::cali()
-{
-    usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
-        .tx_buffer_size = BUF_SIZE,
-        .rx_buffer_size = BUF_SIZE,
-    };
-    wavebusy = false;
-    ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_jtag_config));
-    uint8_t *recv_data = (uint8_t *)malloc(BUF_SIZE);
-    while (1)
-    {
-        memset(recv_data, 0, BUF_SIZE);
-        int len = usb_serial_jtag_read_bytes(recv_data, BUF_SIZE - 1, 0x20 / portTICK_PERIOD_MS);
-        if (len > 0)
-        {
-            int index = 0, data = 0;
-            sscanf((char *)recv_data, "%d:%X", &index, &data);
-            printf("Parsed contents: %d and 0x%02X\n", index, data);
-            internal_gram[index] = data;
-        }
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
 }
 
 /**

@@ -10,9 +10,9 @@
 #define SUB_DISPLAY_EN 1
 #define FORD_VFD_EN 0
 #define HNA_16MM65T_EN 0
-#define BOE_48_1504FN_EN 0
+#define BOE_48_1504FN_EN 01
 #define FTB_13_BT_247GN_EN 0
-#define HUV_13SS16T_EN 01
+#define HUV_13SS16T_EN 0
 
 // 板子选择
 #define ESP_D103 0
@@ -21,6 +21,23 @@
 
 #define AMOLED_095 01
 #define AMOLED_191 0
+
+#if AMOLED_095
+
+#define DISPLAY_WIDTH 240
+#define DISPLAY_HEIGHT 120
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y true
+#define DISPLAY_SWAP_XY true
+
+#elif AMOLED_191
+
+#define DISPLAY_WIDTH 536
+#define DISPLAY_HEIGHT 240
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY true
+#endif
 
 #if ESP_D103
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
@@ -161,9 +178,9 @@
 #define VFD_HOST SPI3_HOST
 #define SD_HOST SPI3_HOST
 
-#define DISPLAY_WIDTH 536
-#define DISPLAY_HEIGHT 240
-#define DISPLAY_MIRROR_X false
+#define DISPLAY_WIDTH 240
+#define DISPLAY_HEIGHT 120
+#define DISPLAY_MIRROR_X true
 #define DISPLAY_MIRROR_Y false
 #define DISPLAY_SWAP_XY true
 
@@ -258,12 +275,6 @@
 
 #define LCD_HOST SPI2_HOST
 #define VFD_HOST SPI3_HOST
-
-#define DISPLAY_WIDTH 536
-#define DISPLAY_HEIGHT 240
-#define DISPLAY_MIRROR_X false
-#define DISPLAY_MIRROR_Y false
-#define DISPLAY_SWAP_XY true
 
 #define DISPLAY_OFFSET_X 0
 #define DISPLAY_OFFSET_Y 0
@@ -367,12 +378,6 @@ enum DectectCH
 
 #define LCD_HOST SPI2_HOST
 #define VFD_HOST SPI3_HOST
-
-#define DISPLAY_WIDTH 536
-#define DISPLAY_HEIGHT 240
-#define DISPLAY_MIRROR_X true
-#define DISPLAY_MIRROR_Y false
-#define DISPLAY_SWAP_XY true
 
 #define DISPLAY_OFFSET_X 0
 #define DISPLAY_OFFSET_Y 0

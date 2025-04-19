@@ -1,5 +1,4 @@
 #include "ford_vfd.h"
-#include "driver/usb_serial_jtag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>

@@ -1,5 +1,4 @@
 #include "huv_13ss16t.h"
-#include "driver/usb_serial_jtag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
@@ -252,7 +251,7 @@ void HUV_13SS16T::contentanimate()
                 currentContentData[i].animation_index = get_cgram();
                 if (currentContentData[i].animation_index == -1)
                 {
-                    ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
+                    // ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
                     return;
                 }
             }

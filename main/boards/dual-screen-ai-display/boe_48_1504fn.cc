@@ -1,5 +1,4 @@
 #include "boe_48_1504fn.h"
-#include "driver/usb_serial_jtag.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
@@ -213,7 +212,7 @@ void BOE_48_1504FN::contentanimate()
                 currentContentData[i].animation_index = get_cgram();
                 if (currentContentData[i].animation_index == -1)
                 {
-                    ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
+                    // ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
                     return;
                 }
             }

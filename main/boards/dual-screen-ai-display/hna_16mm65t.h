@@ -390,14 +390,6 @@ public:
      */
     void test();
 
-    /**
-     * @brief A calibration method used to configure the USB SERIAL JTAG and process received data.
-     *
-     * Configures the USB SERIAL JTAG driver and allocates a buffer for receiving data.
-     * Reads the received data in a loop, parses the data, and updates the display buffer.
-     */
-    void cali();
-
 protected:
     /**
      * @brief Displays a numeric character on the screen based on a given character.
