@@ -742,24 +742,18 @@ void Application::OnAudioInput() {
     }
 #endif
 #if CONFIG_USE_AUDIO_PROCESSOR
-    if (audio_processor_.IsRunning()) {
-        ReadAudio(data, 16000, audio_processor_.GetFeedSize());
+if (audio_processor_.IsRunning()) {
+    std::vector<int16_t> data;
+    int samples = audio_processor_.GetFeedSize();
+    if (samples > 0) {
+        ReadAudio(data, 16000, samples);
         audio_processor_.Feed(data);
 #if CONFIG_USE_FFT_EFFECT
-    fft_dsp_processor_.Feed(data);
+        fft_dsp_processor_.Feed(data);
 #endif
         return;
-        std::vector<int16_t> data;
-        int samples = audio_processor_.GetFeedSize();
-        if (samples > 0) {
-            ReadAudio(data, 16000, samples);
-            audio_processor_.Feed(data);
-            #if CONFIG_USE_FFT_EFFECT
-            fft_dsp_processor_.Feed(data);
-        #endif
-            return;
-        }
     }
+}
 #else
     if (device_state_ == kDeviceStateListening) {
         std::vector<int16_t> data;

@@ -218,8 +218,7 @@ st7796_lcd_init_cmd_t st7796_lcd_init_cmds[] = {
     {0x3a, (uint8_t[]){0x05}, 1, 0},
     {0x11, (uint8_t[]){0x00}, 0, 0},
     {0x29, (uint8_t[]){0x00}, 0, 10},
-    {0x06, (uint8_t[]){0x01}, 1, 0}
-};
+    {0x06, (uint8_t[]){0x01}, 1, 0}};
 #endif
 
 class CustomLcdDisplay : public Backlight,
@@ -314,41 +313,47 @@ public:
     void SetBrightnessImpl(uint8_t brightness) override
     {
         // ESP_LOGI(TAG, "brightness: %d", brightness);
-// #if SUB_DISPLAY_EN
-//         SetSubBacklight(brightness);
-// #endif
-//         DisplayLockGuard lock(this);
-//         uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
-//         int lcd_cmd = 0x51;
-//         lcd_cmd &= 0xff;
-//         lcd_cmd <<= 8;
-//         lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
-//         esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
+#if SUB_DISPLAY_EN
+        SetSubBacklight(brightness);
+#endif
+        DisplayLockGuard lock(this);
+        uint8_t data[1] = {((uint8_t)((255 * brightness) / 100))};
+        int lcd_cmd = 0x51;
+#if AMOLED_191
+        lcd_cmd &= 0xff;
+        lcd_cmd <<= 8;
+        lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
+#elif AMOLED_095
+#endif
+        esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
     }
 
     void SetSleep(bool en)
     {
-//         DisplayLockGuard lock(this);
-//         ESP_LOGI(TAG, "LCD sleep");
-//         uint8_t data[1] = {1};
-//         int lcd_cmd = 0x10;
-//         lcd_cmd &= 0xff;
-//         lcd_cmd <<= 8;
-//         lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
-//         if (en)
-//         {
-//             data[0] = 1;
-//             esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-//         }
-//         else
-//         {
-//             data[0] = 0;
-//             esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-//         }
+        DisplayLockGuard lock(this);
+        ESP_LOGI(TAG, "LCD sleep");
+        uint8_t data[1] = {1};
+        int lcd_cmd = 0x10;
+#if AMOLED_191
+        lcd_cmd &= 0xff;
+        lcd_cmd <<= 8;
+        lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
+#elif AMOLED_095
+#endif
+        if (en)
+        {
+            data[0] = 1;
+            esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
+        }
+        else
+        {
+            data[0] = 0;
+            esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
+        }
 
-// #if SUB_DISPLAY_EN
-//         SetSubSleep(en);
-// #endif
+#if SUB_DISPLAY_EN
+        SetSubSleep(en);
+#endif
     }
 
     virtual void SetChatMessage(const char *role, const char *content) override

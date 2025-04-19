@@ -10,8 +10,8 @@
 #define SUB_DISPLAY_EN 1
 #define FORD_VFD_EN 0
 #define HNA_16MM65T_EN 0
-#define BOE_48_1504FN_EN 01
-#define FTB_13_BT_247GN_EN 0
+#define BOE_48_1504FN_EN 0
+#define FTB_13_BT_247GN_EN 01
 #define HUV_13SS16T_EN 0
 
 // 板子选择
@@ -34,7 +34,7 @@
 
 #define DISPLAY_WIDTH 536
 #define DISPLAY_HEIGHT 240
-#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_X false
 #define DISPLAY_MIRROR_Y false
 #define DISPLAY_SWAP_XY true
 #endif
