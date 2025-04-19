@@ -1307,7 +1307,7 @@ private:
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
         buscfg.data0_io_num = PIN_NUM_LCD_DATA0;
         buscfg.max_transfer_sz = DISPLAY_WIDTH * 5 * sizeof(uint16_t);
-        ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_DISABLED));
+        ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
 
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_lcd_panel_handle_t panel = nullptr;
@@ -2002,12 +2002,12 @@ public:
     virtual bool TimeUpdate() override
     {
         // ESP_LOGI(TAG, "FREE spiram: %d", esp_spiram_get_free_size());
-        char infobuff[512];
-        vTaskList(infobuff);
-        printf("\033[2J\033[H");
-        ESP_LOGI(TAG, "%s", infobuff);
-        printf("free_heap_size = %ld\n", esp_get_free_heap_size());
-        printf("free_internal_heap_size = %ld\n", esp_get_free_internal_heap_size());
+        // char infobuff[512];
+        // vTaskList(infobuff);
+        // printf("\033[2J\033[H");
+        // ESP_LOGI(TAG, "%s", infobuff);
+        // printf("free_heap_size = %ld\n", esp_get_free_heap_size());
+        // printf("free_internal_heap_size = %ld\n", esp_get_free_internal_heap_size());
 #if SUB_DISPLAY_EN && FORD_VFD_EN
         static struct tm time_user;
         time_t now = time(NULL);
