@@ -214,7 +214,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
             .buff_spiram = 1,
             .sw_rotate = 0,
             .swap_bytes = 1,
-            .full_refresh = 0,
+            .full_refresh = 1,
             .direct_mode = 0,
         },
 

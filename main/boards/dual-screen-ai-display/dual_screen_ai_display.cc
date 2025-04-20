@@ -50,6 +50,7 @@
 #include "pcf8574.h"
 #include "physics.h"
 #include "power_save_timer.h"
+#include "freertos/semphr.h"
 
 #define TAG "DualScreenAIDisplay"
 
@@ -913,6 +914,11 @@ private:
     adc_oneshot_unit_handle_t adc_handle;
     adc_cali_handle_t bat_adc_cali_handle, dimm_adc_cali_handle;
     i2c_bus_handle_t i2c_bus = NULL;
+#if AMOLED_095
+    Button *touch_i2c_btn_ = NULL;
+    Button *home_i2c_btn_ = NULL;
+    i2c_bus_device_handle_t touch_dev = NULL;
+#endif
     bmp280_handle_t bmp280 = NULL;
     rx8900_handle_t rx8900 = NULL;
     mpu6050_handle_t mpu6050 = NULL;
@@ -1103,6 +1109,7 @@ private:
             app.ToggleChatState(); });
     }
 
+#if AMOLED_191
     static void tp_interrupt_callback(esp_lcd_touch_handle_t tp)
     {
         // auto &app = Application::GetInstance();
@@ -1112,6 +1119,54 @@ private:
         //     app.ToggleChatState();
     }
 
+#elif AMOLED_095
+    // static void tp_interrupt_callback(i2c_bus_device_handle_t dev)
+    // {
+    //     xSemaphoreGiveFromISR(gpio_sem, NULL);
+    // }
+    // static void gpio_task_example(void *arg)
+    // {
+    //     i2c_bus_device_handle_t dev = arg;
+    //     uint8_t data[2] = {0};
+    //     for (;;)
+    //     {
+    //         if (xSemaphoreTake(gpio_sem, portMAX_DELAY))
+    //         {
+    //             if (dev == NULL)
+    //             {
+    //                 continue;
+    //             }
+
+    //             if (i2c_bus_read_bytes(dev, 0x2D, 1, data) != ESP_OK)
+    //             {
+    //                 continue;
+    //             }
+
+    //             if (i2c_bus_read_bytes(dev, 0x70, 1, &data[1]) != ESP_OK)
+    //             {
+    //                 continue;
+    //             }
+    //             ESP_LOGI(TAG, "Touch: %d, Home: %d", data[0], data[1]);
+    //             vTaskDelay(pdMS_TO_TICKS(100));
+    //         }
+    //     }
+    // }
+    static uint8_t btn_home_get_key_value(i2c_bus_device_handle_t dev)
+    {
+        uint8_t data[1] = {0};
+        i2c_bus_read_bytes(dev, 0x70, 1, data);
+        // ESP_LOGI(TAG, "Home: %d", data[0]);
+        return (data[0]) > 50;
+    }
+
+    static uint8_t btn_touch_get_key_value(i2c_bus_device_handle_t dev)
+    {
+        uint8_t data[1] = {0};
+        i2c_bus_read_bytes(dev, 0x2D, 1, data);
+        // ESP_LOGI(TAG, "Touch: %d", data[0]);
+        return ((data[0]) != 0xFF) && (data[0] > 50);
+    }
+#endif
     void InitializeDisplay()
     {
         // Initialize the SPI bus configuration structure
@@ -1357,6 +1412,53 @@ private:
 
         esp_lcd_touch_handle_t tp = nullptr;
 
+#if USE_TOUCH
+        ESP_LOGI(TAG, "Initialize I2C bus");
+        i2c_config_t conf = {
+            .mode = I2C_MODE_MASTER,
+            .sda_io_num = TOUCH_SDA_NUM,
+            .scl_io_num = TOUCH_SCL_NUM,
+            .sda_pullup_en = GPIO_PULLUP_ENABLE,
+            .scl_pullup_en = GPIO_PULLUP_ENABLE,
+            .master = {0},
+            .clk_flags = 0,
+        };
+        conf.master.clk_speed = 400000;
+        i2c_bus_handle_t bus = i2c_bus_create(TOUCH_MASTER_NUM, &conf);
+        if (bus == nullptr)
+        {
+            ESP_LOGW(TAG, "Initialize Touch I2C bus failed");
+            return;
+        }
+        uint8_t device_addresses[256];
+        i2c_bus_scan(bus, device_addresses, 255);
+        touch_dev = i2c_bus_device_create(bus, 0x08, i2c_bus_get_current_clk_speed(bus));
+        if (touch_dev == nullptr)
+        {
+            ESP_LOGW(TAG, "Add Touch I2C to bus failed");
+            return;
+        }
+        button_custom_config_t custom_conf = {0};
+        custom_conf.active_level = 1;
+        custom_conf.button_custom_get_key_value = btn_home_get_key_value;
+        custom_conf.priv = touch_dev;
+
+        home_i2c_btn_ = new Button(custom_conf);
+        custom_conf.button_custom_get_key_value = btn_touch_get_key_value;
+        touch_i2c_btn_ = new Button(custom_conf);
+
+        touch_i2c_btn_->OnClick([this]()
+                                {
+            ESP_LOGI(TAG, "touch_i2c_btn_ pressed");
+            power_save_timer_->WakeUp();
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                ResetWifiConfiguration();
+            }
+            app.ToggleChatState(); });
+        home_i2c_btn_->OnClick([this]()
+                               { ESP_LOGI(TAG, "home_i2c_btn_ pressed"); });
+#endif
 #endif
         display_ = new CustomLcdDisplay(panel_io, panel, tp,
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
@@ -1364,7 +1466,7 @@ private:
                                         DISPLAY_SWAP_XY, spi_device);
         GetBacklight()->SetBrightness(0);
 
-        if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+        if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
         {
             ESP_LOGI(TAG, "Enable amoled power");
             gpio_set_direction(PIN_NUM_LCD_POWER, GPIO_MODE_OUTPUT);

@@ -19,6 +19,20 @@ Button::Button(const button_adc_config_t& adc_cfg) {
 }
 #endif
 
+Button::Button(const button_custom_config_t& custom_cfg) {
+    button_config_t button_config = {
+        .type = BUTTON_TYPE_CUSTOM,
+        .long_press_time = 1000,
+        .short_press_time = 50,
+        .custom_button_config = custom_cfg
+    };
+    button_handle_ = iot_button_create(&button_config);
+    if (button_handle_ == NULL) {
+        ESP_LOGE(TAG, "Failed to create button handle");
+        return;
+    }
+}
+
 Button::Button(gpio_num_t gpio_num, bool active_high) : gpio_num_(gpio_num) {
     if (gpio_num == GPIO_NUM_NC) {
         return;
