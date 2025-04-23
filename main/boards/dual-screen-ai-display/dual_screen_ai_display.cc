@@ -365,7 +365,7 @@ public:
         SetSubContent(content);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         SetSubContent(role, content);
-#elif SUB_DISPLAY_EN && BOE_48_1504FN_EN
+#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN || HUV_13SS16T_EN)
         SetSubContent(content);
 #endif
 
@@ -776,6 +776,10 @@ public:
     }
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN
 
+    void SetSubContent(const char *content)
+    {
+        pixel_show(0, content);
+    }
 #if CONFIG_USE_FFT_EFFECT
     virtual void SpectrumShow(float *buf, int size) override
     {
@@ -785,7 +789,7 @@ public:
 
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show((char *)content.c_str(), timeout);
+        noti_show(0, (char *)content.c_str(), content.size(), true, HUV_13SS16T::UP2DOWN, timeout);
     }
 
     void SetSubSleep(bool en = true)
@@ -1224,7 +1228,7 @@ private:
 
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
-#elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
+#elif SUB_DISPLAY_EN && (FTB_13_BT_247GN_EN || HUV_13SS16T_EN)
 
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
@@ -1242,7 +1246,7 @@ private:
 
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
-#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN || HUV_13SS16T_EN)
+#elif SUB_DISPLAY_EN && (BOE_48_1504FN_EN)
 
         // Set the maximum transfer size in bytes
         buscfg.max_transfer_sz = 256;
@@ -1607,7 +1611,6 @@ private:
         physics_init();
         while (1)
         {
-            printf("\033[2J\033[H");
             auto ret = mpu6050_get_acce(mpu6050, &acce_value);
             if (ret != ESP_OK)
             {
@@ -1615,29 +1618,28 @@ private:
             }
             else
             {
-                char acce_str[100];
-                snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
-                         (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
-                ESP_LOGI(TAG, "%s", acce_str);
+                // char acce_str[100];
+                // snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
+                //          (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
+                // ESP_LOGI(TAG, "%s", acce_str);
                 {
-                    float gx = -acce_value.acce_y;
+                    float gx = acce_value.acce_y;
                     float gy = acce_value.acce_z;
                     physics_update(gx * 9.8 * 2, gy * 9.8 * 2, 0.1);
                 }
-
-                char grid[GRID_HEIGHT][GRID_WIDTH];
-                physics_render_to_grid(grid);
-
-                for (int y = 0; y < GRID_HEIGHT; y++)
+                extern Ball balls[];
+                display_->clear_point();
+                for (int i = 0; i < BALL_COUNT; i++)
                 {
-                    for (int x = 0; x < GRID_WIDTH; x++)
+                    int x = (int)(balls[i].x);
+                    int y = (int)(balls[i].y);
+                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
                     {
-                        printf("%c ", grid[y][x]);
+                        display_->draw_point(x, y, 1);
                     }
-                    printf("\n");
                 }
             }
-            vTaskDelay(pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(30));
         }
     }
 
@@ -1654,9 +1656,9 @@ public:
 
         InitializeAdc();
         InitializeI2c();
-        // test();
         InitializeTimeSync();
         InitializeDisplay();
+        test();
         InitializeIot();
         if (!display_->GetAutoDimming())
             GetBacklight()->RestoreBrightness();
@@ -2160,7 +2162,7 @@ public:
         else
             strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
         blink = !blink;
-        display_->content_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
+        // display_->content_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         static struct tm time_user;
         time_t now = time(NULL);

@@ -1,7 +1,7 @@
 #include <math.h>
 #include <string.h>
 #include "physics.h"
-static Ball balls[BALL_COUNT];
+Ball balls[BALL_COUNT];
 
 void physics_init()
 {

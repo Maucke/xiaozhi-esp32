@@ -1,205 +1,208 @@
+/*
+ * Author: 施华锋
+ * Date: 2025-02-12
+ * Description: This file implements the methods of the HUV_13SS16T class for communicating with the HUV_13SS16T device via SPI.
+ */
+
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
 #include "huv_13ss16t.h"
-#include <freertos/FreeRTOS.h>
-#include <freertos/event_groups.h>
-#include <freertos/task.h>
-#include <string.h>
-#include <esp_log.h>
+#include "string.h"
 
-// Define the log tag
 #define TAG "HUV_13SS16T"
-
-/**
- * @brief Constructor for the PT6302 class.
- *
- * Initializes the PT6302 object with the specified GPIO pins and SPI host device.
- *
- * @param din The GPIO pin number for the data input line.
- * @param clk The GPIO pin number for the clock line.
- * @param cs The GPIO pin number for the chip select line.
- * @param spi_num The SPI host device number to use for communication.
- */
-HUV_13SS16T::HUV_13SS16T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
+// 0x00-0x0D 原始数据，可带最多9*13参数，地址自增
+// 0x20-0x3F 原始点阵数据，bit 4-2:x, bit 0:y 后须带5的倍数数据，地址自增
+// 0x40-0x5F 原始数字数据，bit 4-0:x，地址自增
+// 0x60 图标，byte1位置，共49个，地址自增
+// 0x80-0x9F 数字ASCII，bit 4-1:x 地址自增
+// 0xA0-0xAF 点阵ASCII，bit 4-2:x, bit 0:y ，地址自增
+// 0xB0-0xBF 命令
+// 0xB0 dimming: 0-100
+void HUV_13SS16T::write_data8(uint8_t *dat, int len)
 {
-    init();
+    // Create an SPI transaction structure and initialize it to zero
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+
+    // Set the length of the transaction in bits
+    t.length = len * 8;
+
+    // Set the pointer to the data buffer to be transmitted
+    t.tx_buffer = dat;
+
+    // Queue the SPI transaction. This function will block until the transaction can be queued.
+    ESP_ERROR_CHECK(spi_device_queue_trans(spi_device_, &t, portMAX_DELAY));
+
+    // The following code can be uncommented if you need to wait for the transaction to complete and verify the result
+    spi_transaction_t *ret_trans;
+    ESP_ERROR_CHECK(spi_device_get_trans_result(spi_device_, &ret_trans, portMAX_DELAY));
+    assert(ret_trans == &t);
+    // vTaskDelay(pdMS_TO_TICKS(10));
+
+    return;
+}
+
+HUV_13SS16T::HUV_13SS16T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num)
+{
+    // Initialize the SPI bus configuration structure
+    spi_bus_config_t buscfg = {0};
+
+    // Log the initialization process
+    ESP_LOGI(TAG, "Initialize HUV_13SS16T SPI bus");
+
+    // Set the clock and data pins for the SPI bus
+    buscfg.sclk_io_num = clk;
+    buscfg.data0_io_num = din;
+
+    // Set the maximum transfer size in bytes
+    buscfg.max_transfer_sz = 256;
+
+    // Initialize the SPI bus with the specified configuration
+    ESP_ERROR_CHECK(spi_bus_initialize(spi_num, &buscfg, SPI_DMA_CH_AUTO));
+
+    // Initialize the SPI device interface configuration structure
+    spi_device_interface_config_t devcfg = {
+        .mode = 0,                 // Set the SPI mode to 3
+        .clock_speed_hz = 1000000, // Set the clock speed to 1MHz
+        .spics_io_num = cs,        // Set the chip select pin
+        .queue_size = 7,
+    };
+
+    // Add the HUV_13SS16T device to the SPI bus with the specified configuration
+    ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
     init_task();
     ESP_LOGI(TAG, "HUV_13SS16T Initalized");
 }
 
-/**
- * @brief Constructor of the HUV_13SS16T class.
- *
- * Initializes the PT6302 device and creates a task to refresh the display and perform animations.
- *
- * @param spi_device The SPI device handle used to communicate with the PT6302.
- */
-HUV_13SS16T::HUV_13SS16T(spi_device_handle_t spi_device) : PT6302(spi_device)
+HUV_13SS16T::HUV_13SS16T(spi_device_handle_t spi_device) : spi_device_(spi_device)
 {
-    if (!spi_device)
-    {
-        ESP_LOGE(TAG, "VFD spi is null");
-        return;
-    }
-    init();
     init_task();
     ESP_LOGI(TAG, "HUV_13SS16T Initalized");
-}
-
-void HUV_13SS16T::refrash(Gram *gram)
-{
-    if (gram == nullptr)
-        return;
-    write_cgram(0, gram->cgram, CGRAM_SIZE * 5);
-    write_dcram(5, gram->number, DISPLAY_SIZE);
-    write_adram(0, gram->symbol, GR_COUNT);
-    write_dimming();
-}
-
-void HUV_13SS16T::find_enum_code(Symbols flag, int *byteIndex, int *bitMask)
-{
-    if (flag >= SYMBOL_MAX)
-        return;
-    int index = (int)flag;
-    if (35 == (index % 36))
-    {
-        *byteIndex = 25 + (index / 36);
-        *bitMask = 1;
-    }
-    else
-    {
-        *byteIndex = ((index / 36) * 5) + (index % 36) / 7;
-        *bitMask = 1 << ((index % 36) % 7);
-    }
-}
-
-void HUV_13SS16T::draw_code(Symbols flag, uint8_t dot)
-{
-    int byteIndex, bitMask;
-    find_enum_code(flag, &byteIndex, &bitMask);
-    if (dot)
-        internal_gram.cgram[byteIndex] |= bitMask;
-    else
-        internal_gram.cgram[byteIndex] &= ~bitMask;
-}
-
-void HUV_13SS16T::draw_point(int x, int y, uint8_t dot)
-{
-    if (x >= MAX_X)
-        return;
-    if (y >= MAX_Y)
-        return;
-    draw_code(pixelMap[y][x][0], dot);
-    draw_code(pixelMap[y][x][1], dot);
 }
 
 void HUV_13SS16T::init_task()
 {
-    write_grnum(GR_COUNT);
-    const uint8_t values[5] = {
-        0, 1, 2, 3, 4};
-    write_dcram(0, (uint8_t *)values, 5);
-    // noti_show("Test long string present: 0123456789", 5000);
-    memset(internal_gram.symbol, 0, sizeof internal_gram.symbol);
-    memset(internal_gram.cgram, 0, sizeof internal_gram.cgram);
-    for (size_t i = 0; i < 10; i++)
-    {
-        charhelper(i, ' ');
-    }
-    for (int i = 0; i < DISPLAY_SIZE; i++)
-    {
-        currentContentData[i].animation_index = -1;
-        tempContentData[i].animation_index = -1;
-    }
-    for (size_t i = 0; i < MAX_X; i++)
-    {
-        for (size_t j = 0; j < MAX_Y; j++)
-        {
-            if ((i + j) % 2)
-                draw_point(i, j, 1);
-            else
-                draw_point(i, j, 0);
-        }
-    }
-
-    refrash(&internal_gram);
     xTaskCreate(
         [](void *arg)
         {
             int count = 0;
             HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
-            // char tempstr[10];
-
             while (true)
             {
-                // vfd->internal_gram.cgram[(count / 8 - 1) % 25] = 0;
-                // vfd->internal_gram.cgram[count / 8 % 25] = 1 << (count % 8);
+                // vfd->clear_point();
+                // for (size_t i = 0; i < MAX_X; i++)
+                // {
+                //     for (size_t j = 0; j < MAX_Y; j++)
+                //     {
+                //         vfd->draw_point(i, j, (j + i + count) % 2);
+                //     }
+                // }
 
-                // snprintf(tempstr, 10, "%d-%d", count / 8 % 25, count % 8);
-                // vfd->content_show(0, tempstr, 4, false, HUV_13SS16T::NONE);
-                // vfd->symbolhelper((Symbols)((count / 10) % SYMBOL_COUNT), false);
                 if (!((++count) % 12))
                 {
                     vfd->display_buffer();
                     vfd->scroll_buffer();
                 }
-                // vfd->symbolhelper((Symbols)((count / 10) % SYMBOL_COUNT), true);
-                vfd->refrash(&vfd->internal_gram);
-                vTaskDelay(pdMS_TO_TICKS(10));
-                vfd->contentanimate();
+                vfd->refrash();
+                vTaskDelay(pdMS_TO_TICKS(30));
+                vfd->pixelanimate();
             }
             vTaskDelete(NULL);
         },
         "vfd",
-        4096 - 1024,
+        4096,
         this,
         6,
         nullptr);
 }
 
-void HUV_13SS16T::charhelper(int index, char ch)
+void HUV_13SS16T::test()
 {
-    if (index <= (DISPLAY_SIZE - 1))
-        internal_gram.number[index] = ch;
+    static bool face = false;
+    for (size_t i = 0; i < sizeof pixel_gram; i++)
+    {
+        if (face)
+            pixel_gram[i] = rand();
+        else
+            pixel_gram[i] = 0xFF;
+    }
+    face = !face;
+    refrash();
 }
 
-void HUV_13SS16T::charhelper(int index, int ramindex, uint8_t *code)
+void HUV_13SS16T::setbrightness(uint8_t brightness)
 {
-    if (index <= (DISPLAY_SIZE - 1) && ramindex <= 2)
+    dimming = brightness;
+    if (dimming < 5)
+        dimming = 5;
+}
+
+void HUV_13SS16T::setsleep(bool en)
+{
+    if (en)
     {
-        for (size_t i = 0; i < 5; i++)
-            internal_gram.cgram[5 * SYMBOL_CGRAM_SIZE + ramindex * 5 + i] = code[i];
-        internal_gram.number[index] = ramindex + SYMBOL_CGRAM_SIZE;
+        memset(pixel_gram, 0, sizeof pixel_gram);
     }
 }
 
-const uint8_t *HUV_13SS16T::find_content_hex_code(char ch)
+void HUV_13SS16T::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
+{
+    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentPixelData[i].animation_type = ani;
+        currentPixelData[i].current_content = ' ';
+        if (forceupdate)
+            currentPixelData[i].need_update = true;
+    }
+    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    {
+        currentPixelData[start + i].animation_type = ani;
+        currentPixelData[start + i].current_content = buf[i];
+        if (forceupdate)
+            currentPixelData[start + i].need_update = true;
+    }
+}
+
+void HUV_13SS16T::pixel_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+{
+    if (content_inhibit_time != 0)
+    {
+        for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+        {
+            tempPixelData[start + i].animation_type = ani;
+            tempPixelData[start + i].current_content = buf[i];
+            if (forceupdate)
+                tempPixelData[start + i].need_update = true;
+        }
+        return;
+    }
+    for (size_t i = 0; i < size && (start + i) < PIXEL_COUNT; i++)
+    {
+        currentPixelData[start + i].animation_type = ani;
+        currentPixelData[start + i].current_content = buf[i];
+        if (forceupdate)
+            currentPixelData[start + i].need_update = true;
+    }
+}
+
+const uint8_t *HUV_13SS16T::find_pixel_hex_code(char ch)
 {
     if (ch >= ' ' && ch <= ('~' + 1))
         return hex_codes[ch - ' '];
     return hex_codes[0];
 }
 
-int HUV_13SS16T::get_cgram()
+uint8_t HUV_13SS16T::find_num_hex_code(char ch)
 {
-    for (size_t i = 0; i < 3; i++)
-    {
-        if (!cgramBusy[i])
-        {
-            cgramBusy[i] = true;
-            return i;
-        }
-    }
-    return -1;
+    if (ch >= ' ' && ch <= 'Z')
+        return num_hex_codes[ch - ' '];
+    else if (ch >= 'a' && ch <= 'z')
+        return num_hex_codes[ch - 'a' + 'A' - ' '];
+    return 0;
 }
 
-void HUV_13SS16T::free_cgram(int *index)
-{
-    if (*index > 2 || *index < 0)
-        return;
-    cgramBusy[*index] = false;
-    *index = -1;
-}
-
-void HUV_13SS16T::contentanimate()
+void HUV_13SS16T::pixelanimate()
 {
     static int64_t start_time = esp_timer_get_time() / 1000;
     int64_t current_time = esp_timer_get_time() / 1000;
@@ -216,70 +219,43 @@ void HUV_13SS16T::contentanimate()
         elapsed_time = current_time - content_inhibit_time;
         if (elapsed_time > 0)
         {
-            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            for (size_t i = 0; i < PIXEL_COUNT; i++)
             {
-                currentContentData[i].last_content = currentContentData[i].current_content;
-                currentContentData[i].animation_type = NONE;
-                currentContentData[i].current_content = tempContentData[i].current_content;
-                currentContentData[i].need_update = true;
-                free_cgram(&currentContentData[i].animation_index);
+                currentPixelData[i].last_content = currentPixelData[i].current_content;
+                currentPixelData[i].animation_type = tempPixelData[i].animation_type;
+                currentPixelData[i].current_content = tempPixelData[i].current_content;
+                currentPixelData[i].need_update = true;
             }
-
             content_inhibit_time = 0;
         }
     }
 
-    for (int i = 0; i < DISPLAY_SIZE; i++)
+    for (int i = 0; i < PIXEL_COUNT; i++)
     {
-        if (currentContentData[i].current_content != currentContentData[i].last_content || currentContentData[i].need_update)
+        if (currentPixelData[i].current_content != currentPixelData[i].last_content || currentPixelData[i].need_update)
         {
-            if (currentContentData[i].animation_type == NONE)
-            {
-                currentContentData[i].need_update = false;
-                currentContentData[i].last_content = currentContentData[i].current_content;
-                if (currentContentData[i].current_content < 8)
-                    charhelper(i, ' ');
-                else
-                    charhelper(i, currentContentData[i].current_content);
-                free_cgram(&currentContentData[i].animation_index);
-
-                continue;
-            }
-
-            if (currentContentData[i].animation_index == -1)
-            {
-                currentContentData[i].animation_index = get_cgram();
-                if (currentContentData[i].animation_index == -1)
-                {
-                    // ESP_LOGI(TAG, "currentContentData[%d].animation_index = -1", i);
-                    return;
-                }
-            }
-            currentContentData[i].animation_step++;
-            const uint8_t *before_raw_code = find_content_hex_code(currentContentData[i].last_content);
-            const uint8_t *raw_code = find_content_hex_code(currentContentData[i].current_content);
-
-            // ESP_LOGI(TAG, "%c-%c", currentContentData[i].last_content, currentContentData[i].current_content);
-
-            if (currentContentData[i].animation_type == UP2DOWN)
+            currentPixelData[i].animation_step++;
+            const uint8_t *before_raw_code = find_pixel_hex_code(currentPixelData[i].last_content);
+            const uint8_t *raw_code = find_pixel_hex_code(currentPixelData[i].current_content);
+            if (currentPixelData[i].animation_type == UP2DOWN)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[j] << currentContentData[i].animation_step) | (raw_code[j] >> (8 - currentContentData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] << currentPixelData[i].animation_step) | (raw_code[j] >> (8 - currentPixelData[i].animation_step));
 
-                if (currentContentData[i].animation_step >= 8)
-                    currentContentData[i].animation_step = -1;
+                if (currentPixelData[i].animation_step >= 8)
+                    currentPixelData[i].animation_step = -1;
             }
-            else if (currentContentData[i].animation_type == DOWN2UP)
+            else if (currentPixelData[i].animation_type == DOWN2UP)
             {
                 for (int j = 0; j < 5; j++)
-                    temp_code[j] = (before_raw_code[j] >> currentContentData[i].animation_step) | (raw_code[j] << (8 - currentContentData[i].animation_step));
+                    temp_code[j] = (before_raw_code[j] >> currentPixelData[i].animation_step) | (raw_code[j] << (8 - currentPixelData[i].animation_step));
 
-                if (currentContentData[i].animation_step >= 8)
-                    currentContentData[i].animation_step = -1;
+                if (currentPixelData[i].animation_step >= 8)
+                    currentPixelData[i].animation_step = -1;
             }
-            else if (currentContentData[i].animation_type == LEFT2RT)
+            else if (currentPixelData[i].animation_type == LEFT2RT)
             {
-                switch (currentContentData[i].animation_step)
+                switch (currentPixelData[i].animation_step)
                 {
                 case 0:
                     for (int j = 0; j < 4; j++)
@@ -306,13 +282,13 @@ void HUV_13SS16T::contentanimate()
                         temp_code[j] = raw_code[j - 1];
                     break;
                 default:
-                    currentContentData[i].animation_step = -1;
+                    currentPixelData[i].animation_step = -1;
                     break;
                 }
             }
-            else if (currentContentData[i].animation_type == RT2LEFT)
+            else if (currentPixelData[i].animation_type == RT2LEFT)
             {
-                switch (currentContentData[i].animation_step)
+                switch (currentPixelData[i].animation_step)
                 {
                 case 0:
                     for (int j = 0; j < 4; j++)
@@ -339,98 +315,136 @@ void HUV_13SS16T::contentanimate()
                         temp_code[j - 1] = raw_code[j];
                     break;
                 default:
-                    currentContentData[i].animation_step = -1;
+                    currentPixelData[i].animation_step = -1;
                     break;
                 }
             }
             else
-                currentContentData[i].animation_step = -1;
+                currentPixelData[i].animation_step = -1;
 
-            if (currentContentData[i].animation_step == -1)
+            if (currentPixelData[i].animation_step == -1)
             {
-                currentContentData[i].need_update = false;
-                currentContentData[i].last_content = currentContentData[i].current_content;
-                if (currentContentData[i].current_content < 8)
-                    charhelper(i, ' ');
-                else
-                    charhelper(i, currentContentData[i].current_content);
-                free_cgram(&currentContentData[i].animation_index);
+                currentPixelData[i].need_update = false;
+                currentPixelData[i].last_content = currentPixelData[i].current_content;
+                memcpy(temp_code, raw_code, sizeof temp_code);
             }
-            else
-            {
-                charhelper(i, currentContentData[i].animation_index, temp_code);
-            }
+
+            pixelhelper(i, temp_code);
         }
     }
 }
 
-void HUV_13SS16T::noti_show(int start, const char *buf, int size, bool forceupdate, NumAni ani, int timeout)
+uint8_t HUV_13SS16T::contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask)
 {
-    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
-    for (size_t i = 0; i < DISPLAY_SIZE; i++)
-    {
-        currentContentData[i].animation_type = ani;
-        currentContentData[i].current_content = ' ';
-        if (forceupdate)
-            currentContentData[i].need_update = true;
-    }
-    for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
-    {
-        currentContentData[start + i].animation_type = ani;
-        currentContentData[start + i].current_content = buf[i];
-        if (forceupdate)
-            currentContentData[start + i].need_update = true;
-    }
+    return (raw & mask) | (before_raw & (~mask));
 }
 
-void HUV_13SS16T::content_show(int start, const char *buf, int size, bool forceupdate, NumAni ani)
+void HUV_13SS16T::pixelhelper(int index, uint8_t *code)
 {
-    if (content_inhibit_time != 0)
-    {
-        for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
-        {
-            tempContentData[start + i].animation_type = ani;
-            tempContentData[start + i].current_content = buf[i];
-            if (forceupdate)
-                tempContentData[start + i].need_update = true;
-        }
+    memcpy(pixel_gram + index * 5, code, 5);
+}
+
+void HUV_13SS16T::time_blink()
+{
+    static bool time_mark = true;
+    time_mark = !time_mark;
+}
+
+void HUV_13SS16T::set_fonttype(int index)
+{
+#if USE_MUTI_FONTS
+    ESP_LOGI(TAG, "fonttype: %d", index % 6);
+    hex_codes = hex_codes_map[index % 6];
+#endif
+}
+
+void HUV_13SS16T::clear_point()
+{
+    memset(matrix_gram, 0, sizeof matrix_gram);
+}
+
+void HUV_13SS16T::draw_point(int x, int y, uint8_t dot)
+{
+    if (x >= MAX_X)
         return;
-    }
-    for (size_t i = 0; i < size && (start + i) < DISPLAY_SIZE; i++)
+    if (y >= MAX_Y)
+        return;
+    matrix_gram[x][y] = dot;
+}
+
+void HUV_13SS16T::refrash() // origin
+{
+    static uint8_t lastdimming = 0;
+    if (lastdimming != dimming)
     {
-        currentContentData[start + i].animation_type = ani;
-        currentContentData[start + i].current_content = buf[i];
-        if (forceupdate)
-            currentContentData[start + i].need_update = true;
+        lastdimming = dimming;
+        dimming_write(dimming);
     }
+    pixel_write(0, 0, pixel_gram, (sizeof pixel_gram) / 5);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    matrix_write(&matrix_gram[0][0]);
+    // num_write(0, num_gram, sizeof num_gram);
+    // icon_write(0, icon_gram, sizeof icon_gram);
+}
+
+void HUV_13SS16T::pixel_write(int x, int y, const uint8_t *code, int len)
+{
+    uint8_t temp_gram[PIXEL_COUNT * 5 + 1];
+    temp_gram[0] = 0x20;
+    temp_gram[0] |= (x & 0xF) << 1;
+    temp_gram[0] |= y != 0;
+    memcpy(temp_gram + 1, code, len * 5);
+    write_data8(temp_gram, len * 5 + 1);
+}
+
+void HUV_13SS16T::pixel_write(int x, int y, const char *ascii, int len)
+{
+    uint8_t temp_gram[PIXEL_COUNT + 1];
+    temp_gram[0] = 0xA0;
+    temp_gram[0] |= (x & 0xF) << 1;
+    temp_gram[0] |= y != 0;
+    memcpy(temp_gram + 1, ascii, len);
+    write_data8(temp_gram, len + 1);
+}
+
+void HUV_13SS16T::matrix_write(const uint8_t *code)
+{
+    uint8_t temp_gram[MAX_X * MAX_Y + 1];
+    temp_gram[0] = 0x40;
+    for (size_t j = 0; j < MAX_Y; j++)
+      for (size_t i = 0; i < MAX_X; i++)
+        temp_gram[j * MAX_X + i + 1] = matrix_gram[i][j];
+    write_data8(temp_gram, MAX_X * MAX_Y + 1);
+}
+
+void HUV_13SS16T::icon_write(Symbols icon, bool en)
+{
+    uint8_t temp_gram[1 + 2];
+    temp_gram[0] = 0x60;
+    temp_gram[1] = (uint8_t)icon;
+    temp_gram[2] = en;
+
+    write_data8(temp_gram, 3);
+}
+
+void HUV_13SS16T::dimming_write(int val)
+{
+    uint8_t temp_gram[2];
+    temp_gram[0] = 0xB0;
+    temp_gram[1] = val;
+
+    write_data8(temp_gram, 2);
 }
 
 void HUV_13SS16T::display_buffer()
 {
-    int64_t current_time = esp_timer_get_time() / 1000;
-    if (content_inhibit_time != 0)
+    if (cb->length_top)
     {
-        int64_t elapsed_time = current_time - content_inhibit_time;
-        if (elapsed_time > 0)
+        if (cb->length_top <= DISPLAY_SIZE)
         {
-            memset(cb->buffer, 0, sizeof cb->buffer);
-            cb->start_pos = 0;
-            cb->length = 0;
-            content_inhibit_time = 0;
-        }
-    }
-    else
-        return;
-    if (cb->length)
-    {
-        if (cb->length <= DISPLAY_SIZE)
-        {
-            for (size_t i = 0; i < DISPLAY_SIZE; i++)
-            {
-                currentContentData[i].animation_type = NONE;
-                currentContentData[i].current_content = cb->buffer[i];
-            }
-            // ESP_LOGI(TAG, "%s", cb->buffer);
+            pixel_show(0, cb->buffer_top, DISPLAY_SIZE, false, DOWN2UP);
+
+            // ESP_LOGI(TAG, "%s", cb->buffer_top);
         }
         else
         {
@@ -438,14 +452,10 @@ void HUV_13SS16T::display_buffer()
             char display[DISPLAY_SIZE + 1];
             for (int i = 0; i < DISPLAY_SIZE; i++)
             {
-                int pos = (cb->start_pos + i) % cb->length;
-                display[i] = cb->buffer[pos];
+                int pos = (cb->start_pos_top + i) % cb->length_top;
+                display[i] = cb->buffer_top[pos];
             }
-            for (size_t i = 0; i < DISPLAY_SIZE; i++)
-            {
-                currentContentData[i].animation_type = NONE;
-                currentContentData[i].current_content = display[i];
-            }
+            pixel_show(0, display, DISPLAY_SIZE, true, LEFT2RT);
 
             // ESP_LOGI(TAG, "%s", display);
         }
@@ -453,15 +463,14 @@ void HUV_13SS16T::display_buffer()
 }
 void HUV_13SS16T::scroll_buffer()
 {
-    if (cb->length > DISPLAY_SIZE)
+    if (cb->length_top > DISPLAY_SIZE)
     {
-        cb->start_pos = (cb->start_pos + 1) % cb->length;
+        cb->start_pos_top = (cb->start_pos_top + 1) % cb->length_top;
     }
 }
 
-void HUV_13SS16T::noti_show(const char *str, int timeout)
+void HUV_13SS16T::pixel_show(int y, const char *str)
 {
-    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     int str_len = strlen(str);
     if (str_len > BUFFER_SIZE)
     {
@@ -470,28 +479,28 @@ void HUV_13SS16T::noti_show(const char *str, int timeout)
         str_len = BUFFER_SIZE;
     }
     {
-        memset(cb->buffer, 0, sizeof cb->buffer);
-        cb->start_pos = 0;
-        cb->length = 0;
-        if (str_len + cb->length <= (BUFFER_SIZE - 2))
+        memset(cb->buffer_top, 0, sizeof cb->buffer_top);
+        cb->start_pos_top = 0;
+        cb->length_top = 0;
+        if (str_len + cb->length_top <= (BUFFER_SIZE - 2))
         {
             // Simple append
-            strncpy(cb->buffer + cb->length, str, str_len);
-            cb->length += str_len;
+            strncpy(cb->buffer_top + cb->length_top, str, str_len);
+            cb->length_top += str_len;
             if (str_len > DISPLAY_SIZE)
             {
-                memset(cb->buffer + cb->length, ' ', 2);
-                cb->length += 2;
+                memset(cb->buffer_top + cb->length_top, ' ', 2);
+                cb->length_top += 2;
             }
         }
         else
         {
             // Need to wrap around
-            int remaining = BUFFER_SIZE - cb->length;
-            strncpy(cb->buffer + cb->length, str, remaining);
-            strncpy(cb->buffer, str + remaining, str_len - remaining);
-            cb->length = BUFFER_SIZE;
-            cb->buffer[cb->length] = '\0';
+            int remaining = BUFFER_SIZE - cb->length_top;
+            strncpy(cb->buffer_top + cb->length_top, str, remaining);
+            strncpy(cb->buffer_top, str + remaining, str_len - remaining);
+            cb->length_top = BUFFER_SIZE;
+            cb->buffer_top[cb->length_top] = '\0';
         }
     }
 }
