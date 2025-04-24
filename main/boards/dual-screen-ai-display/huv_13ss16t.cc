@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "huv_13ss16t.h"
 #include "string.h"
+#include "math.h"
 
 #define TAG "HUV_13SS16T"
 // 0x00-0x0D 原始数据，可带最多9*13参数，地址自增
@@ -86,9 +87,18 @@ void HUV_13SS16T::init_task()
         [](void *arg)
         {
             int count = 0;
+            int16_t raw_acce_x;
+            int16_t raw_acce_y;
+            int16_t raw_acce_z;
             HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
+            vfd->initialize_points();
             while (true)
             {
+                if (vfd->acceCallback != nullptr)
+                {
+                    vfd->acceCallback(vfd->handle_, &raw_acce_x, &raw_acce_y, &raw_acce_z);
+                    vfd->liquid_pixels(raw_acce_x, raw_acce_y, raw_acce_z);
+                }
                 // vfd->clear_point();
                 // for (size_t i = 0; i < MAX_X; i++)
                 // {
@@ -412,8 +422,8 @@ void HUV_13SS16T::matrix_write(const uint8_t *code)
     uint8_t temp_gram[MAX_X * MAX_Y + 1];
     temp_gram[0] = 0x40;
     for (size_t j = 0; j < MAX_Y; j++)
-      for (size_t i = 0; i < MAX_X; i++)
-        temp_gram[j * MAX_X + i + 1] = matrix_gram[i][j];
+        for (size_t i = 0; i < MAX_X; i++)
+            temp_gram[j * MAX_X + i + 1] = matrix_gram[i][j];
     write_data8(temp_gram, MAX_X * MAX_Y + 1);
 }
 
@@ -436,15 +446,32 @@ void HUV_13SS16T::dimming_write(int val)
     write_data8(temp_gram, 2);
 }
 
+
 void HUV_13SS16T::display_buffer()
 {
-    if (cb->length_top)
+    int64_t current_time = esp_timer_get_time() / 1000;
+    if (content_inhibit_time != 0)
     {
-        if (cb->length_top <= DISPLAY_SIZE)
+        int64_t elapsed_time = current_time - content_inhibit_time;
+        if (elapsed_time > 0)
         {
-            pixel_show(0, cb->buffer_top, DISPLAY_SIZE, false, DOWN2UP);
-
-            // ESP_LOGI(TAG, "%s", cb->buffer_top);
+            memset(cb->buffer, 0, sizeof cb->buffer);
+            cb->start_pos = 0;
+            cb->length = 0;
+            content_inhibit_time = 0;
+        }
+    }
+    else
+        return;
+    if (cb->length)
+    {
+        if (cb->length <= DISPLAY_SIZE)
+        {
+            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            {
+                currentPixelData[i].current_content = cb->buffer[i];
+            }
+            // ESP_LOGI(TAG, "%s", cb->buffer);
         }
         else
         {
@@ -452,10 +479,13 @@ void HUV_13SS16T::display_buffer()
             char display[DISPLAY_SIZE + 1];
             for (int i = 0; i < DISPLAY_SIZE; i++)
             {
-                int pos = (cb->start_pos_top + i) % cb->length_top;
-                display[i] = cb->buffer_top[pos];
+                int pos = (cb->start_pos + i) % cb->length;
+                display[i] = cb->buffer[pos];
             }
-            pixel_show(0, display, DISPLAY_SIZE, true, LEFT2RT);
+            for (size_t i = 0; i < DISPLAY_SIZE; i++)
+            {
+                currentPixelData[i].current_content = display[i];
+            }
 
             // ESP_LOGI(TAG, "%s", display);
         }
@@ -463,14 +493,15 @@ void HUV_13SS16T::display_buffer()
 }
 void HUV_13SS16T::scroll_buffer()
 {
-    if (cb->length_top > DISPLAY_SIZE)
+    if (cb->length > DISPLAY_SIZE)
     {
-        cb->start_pos_top = (cb->start_pos_top + 1) % cb->length_top;
+        cb->start_pos = (cb->start_pos + 1) % cb->length;
     }
 }
 
-void HUV_13SS16T::pixel_show(int y, const char *str)
+void HUV_13SS16T::noti_show(const char *str, int timeout)
 {
+    content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     int str_len = strlen(str);
     if (str_len > BUFFER_SIZE)
     {
@@ -479,32 +510,145 @@ void HUV_13SS16T::pixel_show(int y, const char *str)
         str_len = BUFFER_SIZE;
     }
     {
-        memset(cb->buffer_top, 0, sizeof cb->buffer_top);
-        cb->start_pos_top = 0;
-        cb->length_top = 0;
-        if (str_len + cb->length_top <= (BUFFER_SIZE - 2))
+        memset(cb->buffer, 0, sizeof cb->buffer);
+        cb->start_pos = 0;
+        cb->length = 0;
+        if (str_len + cb->length <= (BUFFER_SIZE - 2))
         {
             // Simple append
-            strncpy(cb->buffer_top + cb->length_top, str, str_len);
-            cb->length_top += str_len;
+            strncpy(cb->buffer + cb->length, str, str_len);
+            cb->length += str_len;
             if (str_len > DISPLAY_SIZE)
             {
-                memset(cb->buffer_top + cb->length_top, ' ', 2);
-                cb->length_top += 2;
+                memset(cb->buffer + cb->length, ' ', 2);
+                cb->length += 2;
             }
         }
         else
         {
             // Need to wrap around
-            int remaining = BUFFER_SIZE - cb->length_top;
-            strncpy(cb->buffer_top + cb->length_top, str, remaining);
-            strncpy(cb->buffer_top, str + remaining, str_len - remaining);
-            cb->length_top = BUFFER_SIZE;
-            cb->buffer_top[cb->length_top] = '\0';
+            int remaining = BUFFER_SIZE - cb->length;
+            strncpy(cb->buffer + cb->length, str, remaining);
+            strncpy(cb->buffer, str + remaining, str_len - remaining);
+            cb->length = BUFFER_SIZE;
+            cb->buffer[cb->length] = '\0';
         }
     }
 }
 
-void HUV_13SS16T::spectrum_show(float *buf, int size)
+float FunctionsPitchRoll(float A, float B, float C)
 {
+    float DatoA, DatoB, Value;
+    DatoA = A;
+    DatoB = (B * B) + (C * C);
+    DatoB = sqrt(DatoB);
+
+    Value = atan2(DatoA, DatoB);
+    Value = Value * 180 / 3.14;
+
+    return Value;
+}
+
+void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
+{
+    // Wire.beginTransmission(MPU);
+    // Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H)
+    // Wire.endTransmission(false);
+    // Wire.requestFrom((uint8_t)MPU,(size_t)14,true); // request a total of 14 registers
+    // AcX=Wire.read()<<8|Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+    // AcY=Wire.read()<<8|Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+    // AcZ=Wire.read()<<8|Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+    // Tmp=Wire.read()<<8|Wire.read(); // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+    // GyX=Wire.read()<<8|Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+    // GyY=Wire.read()<<8|Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+    // GyZ=Wire.read()<<8|Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+
+    // calibration
+    // Roll:3.58  Pitch: -4.30
+
+    int Roll = int(FunctionsPitchRoll(AcX, AcY, AcZ) - 3.58);  // Calcolo angolo Roll
+    int Pitch = int(FunctionsPitchRoll(AcY, AcX, AcZ) + 4.30); // Calcolo angolo Pitch
+    // Serial.println("Roll:" + (String)Roll +"  Pitch: " + (String)Pitch) ;
+    // byte btn = digitalRead(BTN_PIN);
+
+    // Calcolo dei vettori di movimento dovuti all'inclinazione del dispositivo
+    float dx = -sin(Roll * PI / 180.0);
+    float dy = sin(Pitch * PI / 180.0);
+
+    // matrix.fillScreen(0);
+    clear_point();
+
+    for (int i = 0; i < DOTS; i++)
+    {
+
+        float tx = points[i].x + points[i].vx;
+        float ty = points[i].y + points[i].vy;
+
+        // new position to check
+        int ntx = round(tx);
+        int nty = round(ty);
+
+        if ((-1 == occupancy[ntx][nty] || occupancy[ntx][nty] == i) && ntx >= 0 && ntx < 10 && nty >= 0 && nty < 10)
+        {
+            occupancy[points[i].px][points[i].py] = -1;
+            // free, new position is available
+            points[i].x = tx;
+            points[i].y = ty;
+            points[i].px = ntx;
+            points[i].py = nty;
+            points[i].vx = (points[i].vx + dx) * FRICTION;
+            points[i].vy = (points[i].vy + dy) * FRICTION;
+            occupancy[ntx][nty] = i;
+            // Serial.println(" FREE");
+        }
+        else
+        {
+
+            // forse questo bloco va fatto prima e poi
+            // va fatto il riposizionamento.
+            // in entrambi i casi devo ricalcolare posizioni, non ha senso che qui faccio solo vettori
+            // (o forse ha senso per risparmiare calcoli)
+
+            if (ntx < 0 || ntx > 9 || nty < 0 || nty > 9)
+            {
+
+                if (ntx > 9)
+                {
+                    points[i].vx = -points[i].vx * FRICTION;
+                }
+                if (ntx < 0)
+                {
+                    points[i].vx = -points[i].vx * FRICTION;
+                }
+
+                if (nty > 9)
+                {
+                    points[i].vy = -points[i].vy * FRICTION;
+                }
+                if (nty < 0.0)
+                {
+                    points[i].vy = -points[i].vy * FRICTION;
+                }
+            }
+            else
+            {
+
+                int j = occupancy[ntx][nty];
+                // CALC relative velocity for collision
+                float Dvx = points[j].vx - points[i].vx;
+                float Dvy = points[j].vy - points[i].vy;
+
+                points[i].vx = (points[i].vx + Dvx) * FRICTION;
+                points[i].vy = (points[i].vy + Dvy) * FRICTION;
+
+                points[j].vx = (points[j].vx - Dvx) * FRICTION;
+                points[j].vy = (points[j].vy - Dvy) * FRICTION;
+            }
+        }
+    }
+
+    for (int i = 0; i < DOTS; i++)
+    {
+        draw_point(points[i].px, points[i].py, 1);
+    }
 }

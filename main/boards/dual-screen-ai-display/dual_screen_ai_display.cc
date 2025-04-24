@@ -45,12 +45,12 @@
 #include "huv_13ss16t.h"
 #endif
 #include "spectrumdisplay.h"
-#include "mpu6050.h"
 #include "ina3221.h"
 #include "pcf8574.h"
 #include "physics.h"
 #include "power_save_timer.h"
 #include "freertos/semphr.h"
+#include "inv_mpu.h"
 
 #define TAG "DualScreenAIDisplay"
 
@@ -778,18 +778,13 @@ public:
 
     void SetSubContent(const char *content)
     {
-        pixel_show(0, content);
+        // pixel_show(0, content);
+        noti_show(content, 5000);
     }
-#if CONFIG_USE_FFT_EFFECT
-    virtual void SpectrumShow(float *buf, int size) override
-    {
-        spectrum_show(buf, size);
-    }
-#endif
 
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show(0, (char *)content.c_str(), content.size(), true, HUV_13SS16T::UP2DOWN, timeout);
+        noti_show(content.c_str(), timeout);
     }
 
     void SetSubSleep(bool en = true)
@@ -923,9 +918,9 @@ private:
     Button *home_i2c_btn_ = NULL;
     i2c_bus_device_handle_t touch_dev = NULL;
 #endif
-    bmp280_handle_t bmp280 = NULL;
-    rx8900_handle_t rx8900 = NULL;
-    mpu6050_handle_t mpu6050 = NULL;
+    bmp280_handle_t bmp280_ = NULL;
+    rx8900_handle_t rx8900_ = NULL;
+    // mpu6050_handle_t mpu6050_ = NULL;
     esp_lcd_panel_io_handle_t panel_io_ = NULL;
     PowerSaveTimer *power_save_timer_;
 #if ESP_DUAL_DISPLAY_V2
@@ -969,7 +964,7 @@ private:
                 pcf8574->writeGpio(SD_EN, 0);
                 pcf8574->writeGpio(TPS_PS, 0);
 #endif
-                mpu6050_sleep(mpu6050); // deactive the mpu, because its lost power to fast
+                // mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
                 GetBacklight()->SetBrightness(0);
                 display_->SetSleep(true);
                 vTaskDelay(pdMS_TO_TICKS(100));
@@ -990,8 +985,9 @@ private:
                     ESP_LOGI(TAG, "Disable force power");
                     gpio_set_level(PIN_NUM_POWER_EN, 0);
                 }
+                mpu_lp_motion_interrupt(20, 20, 2);
                 i2c_bus_delete(&i2c_bus);
-#if ESP_DUAL_DISPLAY_V2
+#if ESP_DUAL_DISPLAY_V211
                 rtc_gpio_pullup_en(TOUCH_INT_NUM);
                 rtc_gpio_pullup_en(WAKE_INT_NUM);
                 rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
@@ -1026,16 +1022,16 @@ private:
         uint8_t device_addresses[256];
         i2c_bus_scan(i2c_bus, device_addresses, 255);
 
-        bmp280 = bmp280_create(i2c_bus, BMP280_I2C_ADDRESS_DEFAULT);
-        esp_err_t ret = bmp280_default_init(bmp280);
+        bmp280_ = bmp280_create(i2c_bus, BMP280_I2C_ADDRESS_DEFAULT);
+        esp_err_t ret = bmp280_default_init(bmp280_);
         ESP_LOGI(TAG, "bmp280_default_init:%d", ret);
-        rx8900 = rx8900_create(i2c_bus, RX8900_I2C_ADDRESS_DEFAULT);
-        ret = rx8900_default_init(rx8900);
+        rx8900_ = rx8900_create(i2c_bus, RX8900_I2C_ADDRESS_DEFAULT);
+        ret = rx8900_default_init(rx8900_);
         ESP_LOGI(TAG, "rx8900_default_init:%d", ret);
         if (ret == ESP_OK)
         {
             struct tm time_user;
-            ret = rx8900_read_time(rx8900, &time_user);
+            ret = rx8900_read_time(rx8900_, &time_user);
             ESP_LOGI(TAG, "rx8900_read_time:%d", ret);
             if (ret == ESP_OK)
             {
@@ -1054,9 +1050,11 @@ private:
             }
         }
 
-        mpu6050 = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
-        ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050));
-        mpu6050_enable_motiondetection(mpu6050, 5, 20);
+        inv_mpu_i2c_init(i2c_bus);
+        mpu_init(nullptr);
+        // mpu6050_ = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
+        // ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050_));
+        // mpu6050_enable_motiondetection(mpu6050_, 5, 20);
 
 #if ESP_DUAL_DISPLAY_V2
         pcf8574 = new PCF8574(i2c_bus);
@@ -1157,20 +1155,43 @@ private:
     // }
     static uint8_t btn_home_get_key_value(i2c_bus_device_handle_t dev)
     {
+        static bool iserr = false;
+        if (iserr)
+            return 0;
         uint8_t data[1] = {0};
-        i2c_bus_read_bytes(dev, 0x70, 1, data);
+        auto ret = i2c_bus_read_bytes(dev, 0x70, 1, data);
+        if (ESP_FAIL == ret)
+            iserr = true;
         // ESP_LOGI(TAG, "Home: %d", data[0]);
         return (data[0]) > 50;
     }
 
     static uint8_t btn_touch_get_key_value(i2c_bus_device_handle_t dev)
     {
+        static bool iserr = false;
+        if (iserr)
+            return 0;
         uint8_t data[1] = {0};
-        i2c_bus_read_bytes(dev, 0x2D, 1, data);
+        auto ret = i2c_bus_read_bytes(dev, 0x2D, 1, data);
+        if (ESP_FAIL == ret)
+            iserr = true;
         // ESP_LOGI(TAG, "Touch: %d", data[0]);
         return ((data[0]) != 0xFF) && (data[0] > 50);
     }
 #endif
+
+    static void mpu6050GetAcceleration(void *handle, int16_t *raw_acce_x, int16_t *raw_acce_y, int16_t *raw_acce_z)
+    {
+        // mpu6050_raw_acce_value_t raw_acce;
+        // mpu6050_handle_t mpu6050 = (mpu6050_handle_t)handle;
+        // mpu6050_get_raw_acce(mpu6050, &raw_acce);
+        short data[3] = {0};
+        mpu_get_accel_reg(data, nullptr);
+        *raw_acce_x = data[0];
+        *raw_acce_y = data[1];
+        *raw_acce_z = data[2];
+    }
+
     void InitializeDisplay()
     {
         // Initialize the SPI bus configuration structure
@@ -1470,6 +1491,9 @@ private:
                                         DISPLAY_SWAP_XY, spi_device);
         GetBacklight()->SetBrightness(0);
 
+#if SUB_DISPLAY_EN && (HUV_13SS16T_EN)
+        display_->setAcceCallback(nullptr, mpu6050GetAcceleration);
+#endif
         if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
         {
             ESP_LOGI(TAG, "Enable amoled power");
@@ -1605,43 +1629,43 @@ private:
         }
     }
 
-    void test()
-    {
-        mpu6050_acce_value_t acce_value;
-        physics_init();
-        while (1)
-        {
-            auto ret = mpu6050_get_acce(mpu6050, &acce_value);
-            if (ret != ESP_OK)
-            {
-                ESP_LOGE(TAG, "Failed to read acceleration data: %s", esp_err_to_name(ret));
-            }
-            else
-            {
-                // char acce_str[100];
-                // snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
-                //          (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
-                // ESP_LOGI(TAG, "%s", acce_str);
-                {
-                    float gx = acce_value.acce_y;
-                    float gy = acce_value.acce_z;
-                    physics_update(gx * 9.8 * 2, gy * 9.8 * 2, 0.1);
-                }
-                extern Ball balls[];
-                display_->clear_point();
-                for (int i = 0; i < BALL_COUNT; i++)
-                {
-                    int x = (int)(balls[i].x);
-                    int y = (int)(balls[i].y);
-                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
-                    {
-                        display_->draw_point(x, y, 1);
-                    }
-                }
-            }
-            vTaskDelay(pdMS_TO_TICKS(30));
-        }
-    }
+    // void test()
+    // {
+    //     mpu6050_acce_value_t acce_value;
+    //     physics_init();
+    //     while (1)
+    //     {
+    //         auto ret = mpu6050_get_acce(mpu6050_, &acce_value);
+    //         if (ret != ESP_OK)
+    //         {
+    //             ESP_LOGE(TAG, "Failed to read acceleration data: %s", esp_err_to_name(ret));
+    //         }
+    //         else
+    //         {
+    //             // char acce_str[100];
+    //             // snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
+    //             //          (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
+    //             // ESP_LOGI(TAG, "%s", acce_str);
+    //             {
+    //                 float gx = acce_value.acce_y;
+    //                 float gy = acce_value.acce_z;
+    //                 physics_update(gx * 9.8 * 2, gy * 9.8 * 2, 0.1);
+    //             }
+    //             extern Ball balls[];
+    //             display_->clear_point();
+    //             for (int i = 0; i < BALL_COUNT; i++)
+    //             {
+    //                 int x = (int)(balls[i].x);
+    //                 int y = (int)(balls[i].y);
+    //                 if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
+    //                 {
+    //                     display_->draw_point(x, y, 1);
+    //                 }
+    //             }
+    //         }
+    //         vTaskDelay(pdMS_TO_TICKS(30));
+    //     }
+    // }
 
 public:
     DualScreenAIDisplay()
@@ -1658,7 +1682,7 @@ public:
         InitializeI2c();
         InitializeTimeSync();
         InitializeDisplay();
-        test();
+        // test();
         InitializeIot();
         if (!display_->GetAutoDimming())
             GetBacklight()->RestoreBrightness();
@@ -1686,7 +1710,7 @@ public:
     virtual float GetBarometer() override
     {
         float pressure = 0.0f;
-        if (ESP_OK == bmp280_read_pressure(bmp280, &pressure))
+        if (ESP_OK == bmp280_read_pressure(bmp280_, &pressure))
         {
             return pressure;
         }
@@ -1696,7 +1720,7 @@ public:
     virtual float GetTemperature() override
     {
         float temperature = 0.0f;
-        if (ESP_OK == bmp280_read_temperature(bmp280, &temperature))
+        if (ESP_OK == bmp280_read_temperature(bmp280_, &temperature))
         {
             return temperature;
         }
@@ -1749,68 +1773,68 @@ public:
         return value;
     }
 
-    esp_err_t testmpu()
-    {
-        mpu6050_acce_value_t acce_value;
-        mpu6050_gyro_value_t gyro_value;
-        complimentary_angle_t complimentary_angle;
+    // esp_err_t testmpu()
+    // {
+    //     mpu6050_acce_value_t acce_value;
+    //     mpu6050_gyro_value_t gyro_value;
+    //     complimentary_angle_t complimentary_angle;
 
-        bool active = 0;
-        mpu6050_getMotionInterruptStatus(mpu6050, &active);
-        ESP_LOGD(TAG, "mpu6050_getMotionInterruptStatus: %d", active);
+    //     bool active = 0;
+    //     mpu6050_getMotionInterruptStatus(mpu6050_, &active);
+    //     ESP_LOGD(TAG, "mpu6050_getMotionInterruptStatus: %d", active);
 
-        auto ret = mpu6050_get_acce(mpu6050, &acce_value);
-        if (ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Failed to read acceleration data: %s", esp_err_to_name(ret));
-        }
-        else
-        {
-            char acce_str[100];
-            snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
-                     (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
-            ESP_LOGI(TAG, "%s", acce_str);
-        }
+    //     auto ret = mpu6050_get_acce(mpu6050_, &acce_value);
+    //     if (ret != ESP_OK)
+    //     {
+    //         ESP_LOGE(TAG, "Failed to read acceleration data: %s", esp_err_to_name(ret));
+    //     }
+    //     else
+    //     {
+    //         char acce_str[100];
+    //         snprintf(acce_str, sizeof(acce_str), "Acceleration Data: X = %.2f, Y = %.2f, Z = %.2f",
+    //                  (float)acce_value.acce_x, (float)acce_value.acce_y, (float)acce_value.acce_z);
+    //         ESP_LOGI(TAG, "%s", acce_str);
+    //     }
 
-        ret = mpu6050_get_gyro(mpu6050, &gyro_value);
-        if (ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Failed to read gyroscope data: %s", esp_err_to_name(ret));
-        }
-        else
-        {
-            char gyro_str[100];
-            snprintf(gyro_str, sizeof(gyro_str), "Gyroscope Data: X = %.2f, Y = %.2f, Z = %.2f",
-                     (float)gyro_value.gyro_x, (float)gyro_value.gyro_y, (float)gyro_value.gyro_z);
-            ESP_LOGI(TAG, "%s", gyro_str);
-        }
-        ret = mpu6050_complimentory_filter(mpu6050, &acce_value, &gyro_value, &complimentary_angle);
-        if (ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Failed to apply complimentary filter: %s", esp_err_to_name(ret));
-        }
+    //     ret = mpu6050_get_gyro(mpu6050_, &gyro_value);
+    //     if (ret != ESP_OK)
+    //     {
+    //         ESP_LOGE(TAG, "Failed to read gyroscope data: %s", esp_err_to_name(ret));
+    //     }
+    //     else
+    //     {
+    //         char gyro_str[100];
+    //         snprintf(gyro_str, sizeof(gyro_str), "Gyroscope Data: X = %.2f, Y = %.2f, Z = %.2f",
+    //                  (float)gyro_value.gyro_x, (float)gyro_value.gyro_y, (float)gyro_value.gyro_z);
+    //         ESP_LOGI(TAG, "%s", gyro_str);
+    //     }
+    //     ret = mpu6050_complimentory_filter(mpu6050_, &acce_value, &gyro_value, &complimentary_angle);
+    //     if (ret != ESP_OK)
+    //     {
+    //         ESP_LOGE(TAG, "Failed to apply complimentary filter: %s", esp_err_to_name(ret));
+    //     }
 
-        ESP_LOGI(TAG, "Roll: %.2f degrees, Pitch: %.2f degrees", complimentary_angle.roll, complimentary_angle.pitch);
+    //     ESP_LOGI(TAG, "Roll: %.2f degrees, Pitch: %.2f degrees", complimentary_angle.roll, complimentary_angle.pitch);
 
-        // esp_err_t ret;
-        // uint8_t mpu6050_deviceid;
-        // mpu6050_raw_acce_value_t acce;
-        // mpu6050_raw_gyro_value_t gyro;
-        // mpu6050_temp_value_t temp;
-        // ret = mpu6050_get_deviceid(mpu6050, &mpu6050_deviceid);
-        // ESP_LOGI(TAG, "mpu6050_deviceid:%X", mpu6050_deviceid);
+    //     // esp_err_t ret;
+    //     // uint8_t mpu6050_deviceid;
+    //     // mpu6050_raw_acce_value_t acce;
+    //     // mpu6050_raw_gyro_value_t gyro;
+    //     // mpu6050_temp_value_t temp;
+    //     // ret = mpu6050_get_deviceid(mpu6050, &mpu6050_deviceid);
+    //     // ESP_LOGI(TAG, "mpu6050_deviceid:%X", mpu6050_deviceid);
 
-        // ret = mpu6050_get_raw_acce(mpu6050, &acce);
-        // ESP_LOGI(TAG, "acce_x:%d, acce_y:%d, acce_z:%d", acce.raw_acce_x, acce.raw_acce_y, acce.raw_acce_z);
+    //     // ret = mpu6050_get_raw_acce(mpu6050, &acce);
+    //     // ESP_LOGI(TAG, "acce_x:%d, acce_y:%d, acce_z:%d", acce.raw_acce_x, acce.raw_acce_y, acce.raw_acce_z);
 
-        // ret = mpu6050_get_raw_gyro(mpu6050, &gyro);
-        // ESP_LOGI(TAG, "gyro_x:%d, gyro_y:%d, gyro_z:%d", gyro.raw_gyro_x, gyro.raw_gyro_y, gyro.raw_gyro_z);
+    //     // ret = mpu6050_get_raw_gyro(mpu6050, &gyro);
+    //     // ESP_LOGI(TAG, "gyro_x:%d, gyro_y:%d, gyro_z:%d", gyro.raw_gyro_x, gyro.raw_gyro_y, gyro.raw_gyro_z);
 
-        // ret = mpu6050_get_temp(mpu6050, &temp);
-        // ESP_LOGI(TAG, "t:%.2f", temp.temp);
+    //     // ret = mpu6050_get_temp(mpu6050, &temp);
+    //     // ESP_LOGI(TAG, "t:%.2f", temp.temp);
 
-        return ret;
-    }
+    //     return ret;
+    // }
 
 #define VCHARGE 4210
 #define V1_UP 4000
@@ -1954,16 +1978,16 @@ public:
         discharging = !charging;
 #endif
         power_save_timer_->SetEnabled(discharging);
-        if (discharging)
-        {
-            bool active;
-            mpu6050_getMotionInterruptStatus(mpu6050, &active);
-            if (active)
-            {
-                power_save_timer_->WakeUp();
-                // ESP_LOGI(TAG, "WakeUp");
-            }
-        }
+        // if (discharging)
+        // {
+        //     bool active;
+        //     mpu6050_getMotionInterruptStatus(mpu6050_, &active);
+        //     if (active)
+        //     {
+        //         power_save_timer_->WakeUp();
+        //         // ESP_LOGI(TAG, "WakeUp");
+        //     }
+        // }
 #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         char temp_str[11];
         snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));
@@ -2071,7 +2095,7 @@ public:
 
     virtual bool CalibrateTime(struct tm *tm_info) override
     {
-        if (rx8900_write_time(rx8900, tm_info) == ESP_FAIL)
+        if (rx8900_write_time(rx8900_, tm_info) == ESP_FAIL)
             return false;
         return true;
     }
@@ -2162,7 +2186,7 @@ public:
         else
             strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
         blink = !blink;
-        // display_->content_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
+        display_->pixel_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         static struct tm time_user;
         time_t now = time(NULL);
