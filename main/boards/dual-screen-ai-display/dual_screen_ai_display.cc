@@ -45,12 +45,12 @@
 #include "huv_13ss16t.h"
 #endif
 #include "spectrumdisplay.h"
+#include "mpu6050.h"
 #include "ina3221.h"
 #include "pcf8574.h"
 #include "physics.h"
 #include "power_save_timer.h"
 #include "freertos/semphr.h"
-#include "inv_mpu.h"
 
 #define TAG "DualScreenAIDisplay"
 
@@ -920,7 +920,7 @@ private:
 #endif
     bmp280_handle_t bmp280_ = NULL;
     rx8900_handle_t rx8900_ = NULL;
-    // mpu6050_handle_t mpu6050_ = NULL;
+    mpu6050_handle_t mpu6050_ = NULL;
     esp_lcd_panel_io_handle_t panel_io_ = NULL;
     PowerSaveTimer *power_save_timer_;
 #if ESP_DUAL_DISPLAY_V2
@@ -964,7 +964,7 @@ private:
                 pcf8574->writeGpio(SD_EN, 0);
                 pcf8574->writeGpio(TPS_PS, 0);
 #endif
-                // mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
+                mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
                 GetBacklight()->SetBrightness(0);
                 display_->SetSleep(true);
                 vTaskDelay(pdMS_TO_TICKS(100));
@@ -985,9 +985,8 @@ private:
                     ESP_LOGI(TAG, "Disable force power");
                     gpio_set_level(PIN_NUM_POWER_EN, 0);
                 }
-                mpu_lp_motion_interrupt(20, 20, 2);
                 i2c_bus_delete(&i2c_bus);
-#if ESP_DUAL_DISPLAY_V211
+#if ESP_DUAL_DISPLAY_V2
                 rtc_gpio_pullup_en(TOUCH_INT_NUM);
                 rtc_gpio_pullup_en(WAKE_INT_NUM);
                 rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
@@ -1050,11 +1049,9 @@ private:
             }
         }
 
-        inv_mpu_i2c_init(i2c_bus);
-        mpu_init(nullptr);
-        // mpu6050_ = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
-        // ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050_));
-        // mpu6050_enable_motiondetection(mpu6050_, 5, 20);
+        mpu6050_ = mpu6050_create(i2c_bus, MPU6050_I2C_ADDRESS);
+        ESP_LOGI(TAG, "mpu6050_init:%d", mpu6050_init(mpu6050_));
+        mpu6050_enable_motiondetection(mpu6050_, 5, 20);
 
 #if ESP_DUAL_DISPLAY_V2
         pcf8574 = new PCF8574(i2c_bus);
@@ -1160,7 +1157,7 @@ private:
             return 0;
         uint8_t data[1] = {0};
         auto ret = i2c_bus_read_bytes(dev, 0x70, 1, data);
-        if (ESP_FAIL == ret)
+        if (ESP_OK != ret)
             iserr = true;
         // ESP_LOGI(TAG, "Home: %d", data[0]);
         return (data[0]) > 50;
@@ -1173,23 +1170,26 @@ private:
             return 0;
         uint8_t data[1] = {0};
         auto ret = i2c_bus_read_bytes(dev, 0x2D, 1, data);
-        if (ESP_FAIL == ret)
+        if (ESP_OK != ret)
             iserr = true;
         // ESP_LOGI(TAG, "Touch: %d", data[0]);
         return ((data[0]) != 0xFF) && (data[0] > 50);
     }
 #endif
 
-    static void mpu6050GetAcceleration(void *handle, int16_t *raw_acce_x, int16_t *raw_acce_y, int16_t *raw_acce_z)
+    static void mpu6050GetAcceleration(void *handle, float *raw_acce_x, float *raw_acce_y, float *raw_acce_z)
     {
+        mpu6050_handle_t mpu6050 = (mpu6050_handle_t)handle;
         // mpu6050_raw_acce_value_t raw_acce;
-        // mpu6050_handle_t mpu6050 = (mpu6050_handle_t)handle;
         // mpu6050_get_raw_acce(mpu6050, &raw_acce);
-        short data[3] = {0};
-        mpu_get_accel_reg(data, nullptr);
-        *raw_acce_x = data[0];
-        *raw_acce_y = data[1];
-        *raw_acce_z = data[2];
+        // *raw_acce_x = raw_acce.raw_acce_x;
+        // *raw_acce_y = raw_acce.raw_acce_y;
+        // *raw_acce_z = raw_acce.raw_acce_z;
+        mpu6050_acce_value_t acce_value;
+        mpu6050_get_acce(mpu6050, &acce_value);
+
+        *raw_acce_x = acce_value.acce_y;
+        *raw_acce_y = acce_value.acce_z;
     }
 
     void InitializeDisplay()
@@ -1492,7 +1492,7 @@ private:
         GetBacklight()->SetBrightness(0);
 
 #if SUB_DISPLAY_EN && (HUV_13SS16T_EN)
-        display_->setAcceCallback(nullptr, mpu6050GetAcceleration);
+        display_->setAcceCallback(mpu6050_, mpu6050GetAcceleration);
 #endif
         if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
         {
@@ -1836,7 +1836,7 @@ public:
     //     return ret;
     // }
 
-#define VCHARGE 4210
+#define VCHARGE 4110
 #define V1_UP 4000
 #define V1_DOWN 3850
 #define V2_UP 3750
@@ -1978,16 +1978,16 @@ public:
         discharging = !charging;
 #endif
         power_save_timer_->SetEnabled(discharging);
-        // if (discharging)
-        // {
-        //     bool active;
-        //     mpu6050_getMotionInterruptStatus(mpu6050_, &active);
-        //     if (active)
-        //     {
-        //         power_save_timer_->WakeUp();
-        //         // ESP_LOGI(TAG, "WakeUp");
-        //     }
-        // }
+        if (discharging)
+        {
+            bool active;
+            mpu6050_getMotionInterruptStatus(mpu6050_, &active);
+            if (active)
+            {
+                power_save_timer_->WakeUp();
+                // ESP_LOGI(TAG, "WakeUp");
+            }
+        }
 #if SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         char temp_str[11];
         snprintf(temp_str, sizeof temp_str, "%d", (int)(bat_v / 10));

@@ -87,9 +87,9 @@ void HUV_13SS16T::init_task()
         [](void *arg)
         {
             int count = 0;
-            int16_t raw_acce_x;
-            int16_t raw_acce_y;
-            int16_t raw_acce_z;
+            float raw_acce_x;
+            float raw_acce_y;
+            float raw_acce_z;
             HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
             vfd->initialize_points();
             while (true)
@@ -446,7 +446,6 @@ void HUV_13SS16T::dimming_write(int val)
     write_data8(temp_gram, 2);
 }
 
-
 void HUV_13SS16T::display_buffer()
 {
     int64_t current_time = esp_timer_get_time() / 1000;
@@ -470,6 +469,7 @@ void HUV_13SS16T::display_buffer()
             for (size_t i = 0; i < DISPLAY_SIZE; i++)
             {
                 currentPixelData[i].current_content = cb->buffer[i];
+                currentPixelData[i].animation_type = DOWN2UP;
             }
             // ESP_LOGI(TAG, "%s", cb->buffer);
         }
@@ -485,6 +485,7 @@ void HUV_13SS16T::display_buffer()
             for (size_t i = 0; i < DISPLAY_SIZE; i++)
             {
                 currentPixelData[i].current_content = display[i];
+                currentPixelData[i].animation_type = LEFT2RT;
             }
 
             // ESP_LOGI(TAG, "%s", display);
@@ -551,104 +552,104 @@ float FunctionsPitchRoll(float A, float B, float C)
 
 void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 {
-    // Wire.beginTransmission(MPU);
-    // Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H)
-    // Wire.endTransmission(false);
-    // Wire.requestFrom((uint8_t)MPU,(size_t)14,true); // request a total of 14 registers
-    // AcX=Wire.read()<<8|Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-    // AcY=Wire.read()<<8|Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-    // AcZ=Wire.read()<<8|Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-    // Tmp=Wire.read()<<8|Wire.read(); // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-    // GyX=Wire.read()<<8|Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    // GyY=Wire.read()<<8|Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    // GyZ=Wire.read()<<8|Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+    float dx = AcX + 0.094727f;
+    float dy = AcY;
 
-    // calibration
-    // Roll:3.58  Pitch: -4.30
-
-    int Roll = int(FunctionsPitchRoll(AcX, AcY, AcZ) - 3.58);  // Calcolo angolo Roll
-    int Pitch = int(FunctionsPitchRoll(AcY, AcX, AcZ) + 4.30); // Calcolo angolo Pitch
-    // Serial.println("Roll:" + (String)Roll +"  Pitch: " + (String)Pitch) ;
-    // byte btn = digitalRead(BTN_PIN);
-
-    // Calcolo dei vettori di movimento dovuti all'inclinazione del dispositivo
-    float dx = -sin(Roll * PI / 180.0);
-    float dy = sin(Pitch * PI / 180.0);
-
-    // matrix.fillScreen(0);
+    dx = std::round(dx * 10) / 10;
+    dy = std::round(dy * 10) / 10;
+    // ESP_LOGI(TAG, "dx: %f, dy: %f", dx, dy);
     clear_point();
+
+    const float base_friction = 0.98f;    // 基础摩擦力（每帧速度保留98%）
+    const float friction_range = 0.02f;   // 摩擦力随机范围
+    const float base_bounce_loss = 0.8f;  // 基础反弹能量损耗（80%保留）
+    const float bounce_loss_range = 0.1f; // 反弹能量损耗随机范围
+    float dt = 0.1f;
+    dx *= 9.8f;
+    dy *= 9.8f;
 
     for (int i = 0; i < DOTS; i++)
     {
+        Ball *b = &balls[i];
+        float prevVx = b->vx;
+        float prevVy = b->vy;
 
-        float tx = points[i].x + points[i].vx;
-        float ty = points[i].y + points[i].vy;
+        b->vx += dx * dt;
+        b->vy += dy * dt;
 
-        // new position to check
-        int ntx = round(tx);
-        int nty = round(ty);
+        // 生成随机摩擦力
+        float friction = base_friction + (float)std::rand() / RAND_MAX * friction_range;
+        // 摩擦力：模拟空气阻力
+        b->vx *= friction;
+        b->vy *= friction;
 
-        if ((-1 == occupancy[ntx][nty] || occupancy[ntx][nty] == i) && ntx >= 0 && ntx < 10 && nty >= 0 && nty < 10)
+        // 计算加速度
+        float ax = (b->vx - prevVx) / dt;
+        float ay = (b->vy - prevVy) / dt;
+        float acceleration = std::sqrt(ax * ax + ay * ay);
+
+        // 判断是否成为边框小球
+        if (acceleration < 0.1)
         {
-            occupancy[points[i].px][points[i].py] = -1;
-            // free, new position is available
-            points[i].x = tx;
-            points[i].y = ty;
-            points[i].px = ntx;
-            points[i].py = nty;
-            points[i].vx = (points[i].vx + dx) * FRICTION;
-            points[i].vy = (points[i].vy + dy) * FRICTION;
-            occupancy[ntx][nty] = i;
-            // Serial.println(" FREE");
+            b->isBorder = true;
         }
         else
+            b->isBorder = false;
+
+        // 移动小球
+        float newX = b->x + b->vx * dt;
+        float newY = b->y + b->vy * dt;
+
+        // 边界反弹
+        if (newX < 0)
         {
+            newX = 0;
+            b->vx *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
+        }
+        else if (newX >= MAX_X)
+        {
+            newX = MAX_X - 0.01;
+            b->vx *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
+        }
 
-            // forse questo bloco va fatto prima e poi
-            // va fatto il riposizionamento.
-            // in entrambi i casi devo ricalcolare posizioni, non ha senso che qui faccio solo vettori
-            // (o forse ha senso per risparmiare calcoli)
+        if (newY < 0)
+        {
+            newY = 0;
+            b->vy *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
+        }
+        else if (newY >= MAX_Y)
+        {
+            newY = MAX_Y - 0.01;
+            b->vy *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
+        }
 
-            if (ntx < 0 || ntx > 9 || nty < 0 || nty > 9)
+        // 检查与边框小球的碰撞
+        if (!b->isBorder)
+        {
+            for (int j = 0; j < DOTS; j++)
             {
-
-                if (ntx > 9)
+                if (balls[j].isBorder)
                 {
-                    points[i].vx = -points[i].vx * FRICTION;
+                    float dx = newX - balls[j].x;
+                    float dy = newY - balls[j].y;
+                    float distance = std::sqrt(dx * dx + dy * dy);
+                    if (distance < 2 * BALL_RADIUS)
+                    {
+                        // 发生碰撞，调整位置
+                        float angle = std::atan2(dy, dx);
+                        newX = balls[j].x + 2 * BALL_RADIUS * std::cos(angle);
+                        newY = balls[j].y + 2 * BALL_RADIUS * std::sin(angle);
+                    }
                 }
-                if (ntx < 0)
-                {
-                    points[i].vx = -points[i].vx * FRICTION;
-                }
-
-                if (nty > 9)
-                {
-                    points[i].vy = -points[i].vy * FRICTION;
-                }
-                if (nty < 0.0)
-                {
-                    points[i].vy = -points[i].vy * FRICTION;
-                }
-            }
-            else
-            {
-
-                int j = occupancy[ntx][nty];
-                // CALC relative velocity for collision
-                float Dvx = points[j].vx - points[i].vx;
-                float Dvy = points[j].vy - points[i].vy;
-
-                points[i].vx = (points[i].vx + Dvx) * FRICTION;
-                points[i].vy = (points[i].vy + Dvy) * FRICTION;
-
-                points[j].vx = (points[j].vx - Dvx) * FRICTION;
-                points[j].vy = (points[j].vy - Dvy) * FRICTION;
             }
         }
+
+        b->x = newX;
+        b->y = newY;
     }
 
     for (int i = 0; i < DOTS; i++)
     {
-        draw_point(points[i].px, points[i].py, 1);
+        draw_point(balls[i].x, balls[i].y, 1);
     }
 }

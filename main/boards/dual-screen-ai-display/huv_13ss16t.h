@@ -740,8 +740,7 @@ public:
 #define BUFFER_SIZE 256
 #define DISPLAY_SIZE 8
 #define DOTS 20
-#define PI 3.1415926535897932384626433832795
-#define FRICTION 0.85
+const float BALL_RADIUS = 1.0f;
 
     typedef struct
     {
@@ -763,17 +762,8 @@ public:
     void clear_point();
     void draw_point(int x, int y, uint8_t dot);
 
-    struct Point
-    {
-        float x; // posizione nella matrice che tiene conto dei microspostamenti
-        float y;
-        int px; // posizione intera nella matrice
-        int py;
-        float vx; // vettori delle velocità
-        float vy;
-    };
 
-    using AcceCallback = void (*)(void *handle, int16_t *raw_acce_x, int16_t *raw_acce_y, int16_t *raw_acce_z);
+    using AcceCallback = void (*)(void *handle, float *raw_acce_x, float *raw_acce_y, float *raw_acce_z);
     void setAcceCallback(void *handle, AcceCallback callback)
     {
         handle_ = handle;
@@ -783,8 +773,17 @@ public:
     void pixel_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT);
 
 private:
-    Point points[DOTS];
-    int occupancy[32][16];
+    typedef struct
+    {
+        float x, y;
+        float vx, vy;
+        bool isBorder; 
+    } Ball;
+
+    Ball balls[DOTS];
+    float getRandomBounceLoss(float base, float range) {
+        return base + (float)std::rand() / RAND_MAX * range;
+    }
     AcceCallback acceCallback = nullptr;
     void *handle_ = nullptr;
 #if USE_MUTI_FONTS
@@ -809,47 +808,54 @@ private:
     void display_buffer();
     void scroll_buffer();
 
-
     uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void write_data8(uint8_t *dat, int len);
     const uint8_t *find_pixel_hex_code(char ch);
     uint8_t find_num_hex_code(char ch);
     void initialize_points()
     {
-        for (int x = 0; x < MAX_X; x++)
-        {
-            for (int y = 0; y < MAX_Y; y++)
-            {
-                occupancy[x][y] = -1;
-            }
-        }
+        // for (int x = 0; x < MAX_X; x++)
+        // {
+        //     for (int y = 0; y < MAX_Y; y++)
+        //     {
+        //         occupancy[x][y] = -1;
+        //     }
+        // }
+
+        // for (int i = 0; i < DOTS; i++)
+        // {
+        //     bool isUnique;
+        //     do
+        //     {
+        //         isUnique = true;
+        //         // Genera valori casuali per x e y attorno al centro (approssimativamente 16, 8)
+        //         points[i].x = rand() % MAX_X;
+        //         points[i].y = rand() % MAX_Y;
+        //         points[i].px = points[i].x;
+        //         points[i].py = points[i].y;
+        //         points[i].vx = 0;
+        //         points[i].vy = 0;
+
+        //         // Controlla se il nuovo punto è sovrapposto a uno già esistente
+        //         for (int j = 0; j < i; j++)
+        //         {
+        //             if ((int)points[i].x == (int)points[j].x && (int)points[i].y == (int)points[j].y)
+        //             {
+        //                 isUnique = false;
+        //                 break;
+        //             }
+        //         }
+        //     } while (!isUnique); // Ripete finché non trova una posizione unica
+
+        //     occupancy[points[i].px][points[i].py] = i;
+        // }
 
         for (int i = 0; i < DOTS; i++)
         {
-            bool isUnique;
-            do
-            {
-                isUnique = true;
-                // Genera valori casuali per x e y attorno al centro (approssimativamente 16, 8)
-                points[i].x = rand() % MAX_X;
-                points[i].y = rand() % MAX_Y;
-                points[i].px = points[i].x;
-                points[i].py = points[i].y;
-                points[i].vx = 0;
-                points[i].vy = 0;
-
-                // Controlla se il nuovo punto è sovrapposto a uno già esistente
-                for (int j = 0; j < i; j++)
-                {
-                    if ((int)points[i].x == (int)points[j].x && (int)points[i].y == (int)points[j].y)
-                    {
-                        isUnique = false;
-                        break;
-                    }
-                }
-            } while (!isUnique); // Ripete finché non trova una posizione unica
-
-            occupancy[points[i].px][points[i].py] = i;
+            balls[i].x = rand() % MAX_X;
+            balls[i].y = rand() % MAX_Y;
+            balls[i].vx = 0;
+            balls[i].vy = 0;
         }
     }
 
