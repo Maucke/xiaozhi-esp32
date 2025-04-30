@@ -92,6 +92,8 @@ void HUV_13SS16T::init_task()
             float raw_acce_z;
             HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
             vfd->initialize_points();
+            vfd->initSnake(&vfd->snake);
+            vfd->initFood(&vfd->food, &vfd->snake);
             while (true)
             {
                 if (vfd->acceCallback != nullptr)
@@ -537,19 +539,6 @@ void HUV_13SS16T::noti_show(const char *str, int timeout)
     }
 }
 
-float FunctionsPitchRoll(float A, float B, float C)
-{
-    float DatoA, DatoB, Value;
-    DatoA = A;
-    DatoB = (B * B) + (C * C);
-    DatoB = sqrt(DatoB);
-
-    Value = atan2(DatoA, DatoB);
-    Value = Value * 180 / 3.14;
-
-    return Value;
-}
-
 void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 {
     float dx = AcX + 0.094727f;
@@ -557,7 +546,42 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 
     dx = std::round(dx * 10) / 10;
     dy = std::round(dy * 10) / 10;
-    // ESP_LOGI(TAG, "dx: %f, dy: %f", dx, dy);
+
+    if (dx == 0)
+    {
+        static int64_t start_time = esp_timer_get_time() / 1000;
+        int64_t current_time = esp_timer_get_time() / 1000;
+
+        int64_t elapsed_time = current_time - start_time;
+
+        if (elapsed_time >= 200)
+            start_time = current_time;
+        else
+            return;
+        printBoard(&snake, &food);
+
+        autoTrackFood(&snake, &food);
+        moveSnake(&snake);
+
+        if (checkEat(&snake, &food))
+        {
+            initFood(&food, &snake);
+        }
+
+        if (checkCollision(&snake))
+        {
+            printf("Game Over!\n");
+            initSnake(&snake);
+        }
+        for (int i = 0; i < snake.length; i++)
+        {
+            balls[i].x = snake.body[i].x;
+            balls[i].y = snake.body[i].y;
+        }
+
+        return;
+    }
+
     clear_point();
 
     const float base_friction = 0.98f;    // 基础摩擦力（每帧速度保留98%）

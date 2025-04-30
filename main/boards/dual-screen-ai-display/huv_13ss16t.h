@@ -740,7 +740,7 @@ public:
 #define BUFFER_SIZE 256
 #define DISPLAY_SIZE 8
 #define DOTS 20
-const float BALL_RADIUS = 1.0f;
+    const float BALL_RADIUS = 1.0f;
 
     typedef struct
     {
@@ -762,7 +762,6 @@ const float BALL_RADIUS = 1.0f;
     void clear_point();
     void draw_point(int x, int y, uint8_t dot);
 
-
     using AcceCallback = void (*)(void *handle, float *raw_acce_x, float *raw_acce_y, float *raw_acce_z);
     void setAcceCallback(void *handle, AcceCallback callback)
     {
@@ -777,11 +776,12 @@ private:
     {
         float x, y;
         float vx, vy;
-        bool isBorder; 
+        bool isBorder;
     } Ball;
 
     Ball balls[DOTS];
-    float getRandomBounceLoss(float base, float range) {
+    float getRandomBounceLoss(float base, float range)
+    {
         return base + (float)std::rand() / RAND_MAX * range;
     }
     AcceCallback acceCallback = nullptr;
@@ -814,42 +814,6 @@ private:
     uint8_t find_num_hex_code(char ch);
     void initialize_points()
     {
-        // for (int x = 0; x < MAX_X; x++)
-        // {
-        //     for (int y = 0; y < MAX_Y; y++)
-        //     {
-        //         occupancy[x][y] = -1;
-        //     }
-        // }
-
-        // for (int i = 0; i < DOTS; i++)
-        // {
-        //     bool isUnique;
-        //     do
-        //     {
-        //         isUnique = true;
-        //         // Genera valori casuali per x e y attorno al centro (approssimativamente 16, 8)
-        //         points[i].x = rand() % MAX_X;
-        //         points[i].y = rand() % MAX_Y;
-        //         points[i].px = points[i].x;
-        //         points[i].py = points[i].y;
-        //         points[i].vx = 0;
-        //         points[i].vy = 0;
-
-        //         // Controlla se il nuovo punto è sovrapposto a uno già esistente
-        //         for (int j = 0; j < i; j++)
-        //         {
-        //             if ((int)points[i].x == (int)points[j].x && (int)points[i].y == (int)points[j].y)
-        //             {
-        //                 isUnique = false;
-        //                 break;
-        //             }
-        //         }
-        //     } while (!isUnique); // Ripete finché non trova una posizione unica
-
-        //     occupancy[points[i].px][points[i].py] = i;
-        // }
-
         for (int i = 0; i < DOTS; i++)
         {
             balls[i].x = rand() % MAX_X;
@@ -865,6 +829,164 @@ protected:
     void matrix_write(const uint8_t *code);
     void icon_write(Symbols icon, bool en);
     void dimming_write(int val);
+
+#define ROWS 10
+#define COLS 9
+#define MAX_LENGTH 10
+#define SNAKE_BODY 1
+#define FOOD_DOT 2
+#define BLANK_DOT 0
+    // 定义蛇的结构体
+    typedef struct
+    {
+        int x;
+        int y;
+    } SnakeSegment;
+
+    // 定义蛇的结构体
+    typedef struct
+    {
+        SnakeSegment body[MAX_LENGTH];
+        int length;
+        int direction; // 0: 上, 1: 右, 2: 下, 3: 左
+    } Snake;
+
+    // 定义食物的结构体
+    typedef struct
+    {
+        int x;
+        int y;
+    } Food;
+    void initSnake(Snake *snake)
+    {
+        snake->length = 3;
+        snake->body[0].x = 2;
+        snake->body[0].y = 2;
+        snake->body[1].x = 1;
+        snake->body[1].y = 2;
+        snake->body[2].x = 0;
+        snake->body[2].y = 2;
+        snake->direction = 1;
+    }
+    void initFood(Food *food, Snake *snake)
+    {
+        int valid;
+        do
+        {
+            valid = 1;
+            food->x = rand() % COLS;
+            food->y = rand() % ROWS;
+            for (int i = 0; i < snake->length; i++)
+            {
+                if (snake->body[i].x == food->x && snake->body[i].y == food->y)
+                {
+                    valid = 0;
+                    break;
+                }
+            }
+        } while (!valid);
+    }
+    // 打印游戏界面
+    void printBoard(Snake *snake, Food *food)
+    {
+        // 先清空界面
+        for (int y = 0; y < ROWS; y++)
+        {
+            for (int x = 0; x < COLS; x++)
+            {
+                draw_point(x, y, BLANK_DOT);
+            }
+        }
+
+        // 绘制蛇
+        for (int i = 0; i < snake->length; i++)
+        {
+            draw_point(snake->body[i].x, snake->body[i].y, SNAKE_BODY);
+        }
+
+        // 绘制食物
+        draw_point(food->x, food->y, FOOD_DOT);
+    }
+
+    // 让蛇自动追踪食物
+    void autoTrackFood(Snake *snake, Food *food)
+    {
+        int headX = snake->body[0].x;
+        int headY = snake->body[0].y;
+
+        if (headX < food->x && snake->direction != 3)
+        {
+            snake->direction = 1;
+        }
+        else if (headX > food->x && snake->direction != 1)
+        {
+            snake->direction = 3;
+        }
+        else if (headY < food->y && snake->direction != 0)
+        {
+            snake->direction = 2;
+        }
+        else if (headY > food->y && snake->direction != 2)
+        {
+            snake->direction = 0;
+        }
+    }
+    // 移动蛇
+    void moveSnake(Snake *snake)
+    {
+        for (int i = snake->length - 1; i > 0; i--)
+        {
+            snake->body[i].x = snake->body[i - 1].x;
+            snake->body[i].y = snake->body[i - 1].y;
+        }
+
+        switch (snake->direction)
+        {
+        case 0:
+            snake->body[0].y--;
+            break;
+        case 1:
+            snake->body[0].x++;
+            break;
+        case 2:
+            snake->body[0].y++;
+            break;
+        case 3:
+            snake->body[0].x--;
+            break;
+        }
+    }
+    // 检查蛇是否吃到食物
+    int checkEat(Snake *snake, Food *food)
+    {
+        if (snake->body[0].x == food->x && snake->body[0].y == food->y)
+        {
+            snake->length++;
+            snake->body[snake->length - 1].x = snake->body[snake->length - 2].x;
+            snake->body[snake->length - 1].y = snake->body[snake->length - 2].y;
+            return 1;
+        }
+        return 0;
+    }
+
+    // 检查蛇是否撞到墙壁或自己
+    int checkCollision(Snake *snake)
+    {
+        if (snake->body[0].x < 0 || snake->body[0].x >= COLS || snake->body[0].y < 0 || snake->body[0].y >= ROWS)
+        {
+            return 1;
+        }
+        for (int i = 1; i < snake->length; i++)
+        {
+            if (snake->body[0].x == snake->body[i].x && snake->body[0].y == snake->body[i].y)
+            {
+                return 1;
+            }
+        }
+        return 0;
+    }
+    Snake snake;
+    Food food;
 };
 
 #endif
