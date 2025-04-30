@@ -75,13 +75,12 @@ void FORD_VFD::write_data8(uint8_t *dat, int len)
 void FORD_VFD::setbrightness(uint8_t brightness)
 {
 	dimming = brightness * 127 / 100;
-	if (dimming < 5)
-		dimming = 5;
-	// ESP_LOGI(TAG, "FORD_VFD dimming: %d, %d", dimming, brightness);
 }
 
 void FORD_VFD::refrash(uint8_t *gram, int size)
 {
+	if (dimming < 5)
+		dimming = 5;
 	uint8_t data[2] = {0xcf, (uint8_t)(dimming & 0xFC)};
 
 	write_data8((uint8_t *)data, 2);

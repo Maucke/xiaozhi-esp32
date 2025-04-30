@@ -76,10 +76,6 @@ void PT6324::init()
 void PT6324::setbrightness(uint8_t brightness)
 {
     dimming = brightness * 8 / 100;
-    if (dimming > 7)
-        dimming = 7;
-    if (dimming < 1)
-        dimming = 1;
     // ESP_LOGI(TAG, "dimming %d", dimming);
 }
 
@@ -109,6 +105,10 @@ void PT6324::refrash(uint8_t *gram)
     // Define the command to turn on the display
     uint8_t data[1] = {0x80};
 
+    if (dimming > 7)
+        dimming = 7;
+    if (dimming < 1)
+        dimming = 1;
     data[0] |= dimming | (dimming ? 0x8 : 0);
 
     // Send the display on command to the PT6324 device

@@ -8,19 +8,19 @@
 
 // 副屏选择，如果有副屏，则需打开SUB_DISPLAY_EN和对应屏幕
 #define SUB_DISPLAY_EN 1
-#define FORD_VFD_EN 0
+#define FORD_VFD_EN 01
 #define HNA_16MM65T_EN 0
 #define BOE_48_1504FN_EN 0
 #define FTB_13_BT_247GN_EN 0
-#define HUV_13SS16T_EN 01
+#define HUV_13SS16T_EN 0
 
 // 板子选择
 #define ESP_D103 0
-#define ESP_DUAL_DISPLAY 01
-#define ESP_DUAL_DISPLAY_V2 0
+#define ESP_DUAL_DISPLAY 0
+#define ESP_DUAL_DISPLAY_V2 01
 
-#define AMOLED_095 01
-#define AMOLED_191 0
+#define AMOLED_095 0
+#define AMOLED_191 01
 
 #if AMOLED_095
 

@@ -1489,7 +1489,6 @@ private:
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
                                         DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
                                         DISPLAY_SWAP_XY, spi_device);
-        GetBacklight()->SetBrightness(0);
 
 #if SUB_DISPLAY_EN && (HUV_13SS16T_EN)
         display_->setAcceCallback(mpu6050_, mpu6050GetAcceleration);
@@ -1507,6 +1506,7 @@ private:
             gpio_set_direction(PIN_NUM_VFD_EN, GPIO_MODE_OUTPUT);
             gpio_set_level(PIN_NUM_VFD_EN, 1);
         }
+        GetBacklight()->SetBrightness(0);
     }
 
     // 物联网初始化，添加对 AI 可见设备

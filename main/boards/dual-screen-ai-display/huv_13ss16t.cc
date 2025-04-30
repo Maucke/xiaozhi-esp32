@@ -145,8 +145,6 @@ void HUV_13SS16T::test()
 void HUV_13SS16T::setbrightness(uint8_t brightness)
 {
     dimming = brightness;
-    if (dimming < 5)
-        dimming = 5;
 }
 
 void HUV_13SS16T::setsleep(bool en)
@@ -390,6 +388,8 @@ void HUV_13SS16T::refrash() // origin
     if (lastdimming != dimming)
     {
         lastdimming = dimming;
+        if (dimming < 5)
+            dimming = 5;
         dimming_write(dimming);
     }
     pixel_write(0, 0, pixel_gram, (sizeof pixel_gram) / 5);
