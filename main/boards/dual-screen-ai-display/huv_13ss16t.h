@@ -830,8 +830,8 @@ protected:
     void icon_write(Symbols icon, bool en);
     void dimming_write(int val);
 
-#define ROWS 10
-#define COLS 9
+#define COLS 10
+#define ROWS 9
 #define MAX_LENGTH 10
 #define SNAKE_BODY 1
 #define FOOD_DOT 2
@@ -839,8 +839,8 @@ protected:
     // 定义蛇的结构体
     typedef struct
     {
-        int x;
-        int y;
+        uint16_t x;
+        uint16_t y;
     } SnakeSegment;
 
     // 定义蛇的结构体
@@ -854,18 +854,20 @@ protected:
     // 定义食物的结构体
     typedef struct
     {
-        int x;
-        int y;
+        uint16_t x;
+        uint16_t y;
     } Food;
     void initSnake(Snake *snake)
     {
-        snake->length = 3;
-        snake->body[0].x = 2;
-        snake->body[0].y = 2;
-        snake->body[1].x = 1;
-        snake->body[1].y = 2;
-        snake->body[2].x = 0;
-        snake->body[2].y = 2;
+        snake->length = 4;
+        snake->body[0].x = 3;
+        snake->body[0].y = 8;
+        snake->body[1].x = 2;
+        snake->body[1].y = 8;
+        snake->body[2].x = 1;
+        snake->body[2].y = 8;
+        snake->body[3].x = 0;
+        snake->body[3].y = 8;
         snake->direction = 1;
     }
     void initFood(Food *food, Snake *snake)
@@ -874,12 +876,14 @@ protected:
         do
         {
             valid = 1;
-            food->x = rand() % COLS;
-            food->y = rand() % ROWS;
+            food->x = std::rand() % COLS;
+            food->y = std::rand() % ROWS;
+
             for (int i = 0; i < snake->length; i++)
             {
                 if (snake->body[i].x == food->x && snake->body[i].y == food->y)
                 {
+                    printf("x:%dy:%d %d, x:%dy:%d\r\n", food->x, food->y, i, snake->body[i].x, snake->body[i].y);
                     valid = 0;
                     break;
                 }
@@ -889,15 +893,6 @@ protected:
     // 打印游戏界面
     void printBoard(Snake *snake, Food *food)
     {
-        // 先清空界面
-        for (int y = 0; y < ROWS; y++)
-        {
-            for (int x = 0; x < COLS; x++)
-            {
-                draw_point(x, y, BLANK_DOT);
-            }
-        }
-
         // 绘制蛇
         for (int i = 0; i < snake->length; i++)
         {
@@ -914,21 +909,46 @@ protected:
         int headX = snake->body[0].x;
         int headY = snake->body[0].y;
 
-        if (headX < food->x && snake->direction != 3)
+        if (headY < food->y)
         {
-            snake->direction = 1;
+            if (snake->direction != 0)
+            {
+                snake->direction = 2;
+                return;
+            }
+            else
+                snake->direction = 1;
         }
-        else if (headX > food->x && snake->direction != 1)
+        else if (headY > food->y)
         {
-            snake->direction = 3;
+            if (snake->direction != 2)
+            {
+                snake->direction = 0;
+                return;
+            }
+            else
+                snake->direction = 3;
         }
-        else if (headY < food->y && snake->direction != 0)
+
+        if (headX < food->x)
         {
-            snake->direction = 2;
+            if (snake->direction != 3)
+            {
+                snake->direction = 1;
+                return;
+            }
+            else
+                snake->direction = 0;
         }
-        else if (headY > food->y && snake->direction != 2)
+        else if (headX > food->x)
         {
-            snake->direction = 0;
+            if (snake->direction != 1)
+            {
+                snake->direction = 3;
+                return;
+            }
+            else
+                snake->direction = 2;
         }
     }
     // 移动蛇
@@ -955,6 +975,8 @@ protected:
             snake->body[0].x--;
             break;
         }
+        snake->body[0].x %= COLS;
+        snake->body[0].y %= ROWS;
     }
     // 检查蛇是否吃到食物
     int checkEat(Snake *snake, Food *food)
@@ -962,6 +984,8 @@ protected:
         if (snake->body[0].x == food->x && snake->body[0].y == food->y)
         {
             snake->length++;
+            if (snake->length > 9)
+                snake->length = 9;
             snake->body[snake->length - 1].x = snake->body[snake->length - 2].x;
             snake->body[snake->length - 1].y = snake->body[snake->length - 2].y;
             return 1;
@@ -972,17 +996,17 @@ protected:
     // 检查蛇是否撞到墙壁或自己
     int checkCollision(Snake *snake)
     {
-        if (snake->body[0].x < 0 || snake->body[0].x >= COLS || snake->body[0].y < 0 || snake->body[0].y >= ROWS)
-        {
-            return 1;
-        }
-        for (int i = 1; i < snake->length; i++)
-        {
-            if (snake->body[0].x == snake->body[i].x && snake->body[0].y == snake->body[i].y)
-            {
-                return 1;
-            }
-        }
+        // if (snake->body[0].x < 0 || snake->body[0].x > (COLS - 1) || snake->body[0].y < 0 || snake->body[0].y > (ROWS - 1))
+        // {
+        //     return 1;
+        // }
+        // for (int i = 1; i < snake->length; i++)
+        // {
+        //     if (snake->body[0].x == snake->body[i].x && snake->body[0].y == snake->body[i].y)
+        //     {
+        //         return 1;
+        //     }
+        // }
         return 0;
     }
     Snake snake;

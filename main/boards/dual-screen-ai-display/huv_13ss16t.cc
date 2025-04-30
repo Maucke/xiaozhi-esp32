@@ -541,23 +541,22 @@ void HUV_13SS16T::noti_show(const char *str, int timeout)
 
 void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 {
+    static int64_t start_time = esp_timer_get_time() / 1000;
     float dx = AcX + 0.094727f;
     float dy = AcY;
 
     dx = std::round(dx * 10) / 10;
     dy = std::round(dy * 10) / 10;
 
-    if (dx == 0)
+    int64_t current_time = esp_timer_get_time() / 1000;
+    int64_t elapsed_time = current_time - start_time;
+    if (dx == 0 || elapsed_time < 200)
     {
-        static int64_t start_time = esp_timer_get_time() / 1000;
-        int64_t current_time = esp_timer_get_time() / 1000;
-
-        int64_t elapsed_time = current_time - start_time;
-
         if (elapsed_time >= 200)
             start_time = current_time;
         else
             return;
+        clear_point();
         printBoard(&snake, &food);
 
         autoTrackFood(&snake, &food);
@@ -572,12 +571,15 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
         {
             printf("Game Over!\n");
             initSnake(&snake);
+            initFood(&food, &snake);
         }
         for (int i = 0; i < snake.length; i++)
         {
             balls[i].x = snake.body[i].x;
             balls[i].y = snake.body[i].y;
         }
+        balls[snake.length].x = food.x;
+        balls[snake.length].y = food.y;
 
         return;
     }
@@ -592,11 +594,11 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
     dx *= 9.8f;
     dy *= 9.8f;
 
-    for (int i = 0; i < DOTS; i++)
+    for (int i = 0; i < (snake.length + 1); i++)
     {
         Ball *b = &balls[i];
-        float prevVx = b->vx;
-        float prevVy = b->vy;
+        // float prevVx = b->vx;
+        // float prevVy = b->vy;
 
         b->vx += dx * dt;
         b->vy += dy * dt;
@@ -607,18 +609,9 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
         b->vx *= friction;
         b->vy *= friction;
 
-        // 计算加速度
-        float ax = (b->vx - prevVx) / dt;
-        float ay = (b->vy - prevVy) / dt;
-        float acceleration = std::sqrt(ax * ax + ay * ay);
-
-        // 判断是否成为边框小球
-        if (acceleration < 0.1)
-        {
-            b->isBorder = true;
-        }
-        else
-            b->isBorder = false;
+        // // 计算加速度
+        // float ax = (b->vx - prevVx) / dt;
+        // float ay = (b->vy - prevVy) / dt;
 
         // 移动小球
         float newX = b->x + b->vx * dt;
@@ -630,9 +623,9 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
             newX = 0;
             b->vx *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
         }
-        else if (newX >= MAX_X)
+        else if (newX > (MAX_X - 1))
         {
-            newX = MAX_X - 0.01;
+            newX = MAX_X - 1;
             b->vx *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
         }
 
@@ -641,39 +634,14 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
             newY = 0;
             b->vy *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
         }
-        else if (newY >= MAX_Y)
+        else if (newY > (MAX_Y - 1))
         {
-            newY = MAX_Y - 0.01;
+            newY = MAX_Y - 1;
             b->vy *= -getRandomBounceLoss(base_bounce_loss, bounce_loss_range);
-        }
-
-        // 检查与边框小球的碰撞
-        if (!b->isBorder)
-        {
-            for (int j = 0; j < DOTS; j++)
-            {
-                if (balls[j].isBorder)
-                {
-                    float dx = newX - balls[j].x;
-                    float dy = newY - balls[j].y;
-                    float distance = std::sqrt(dx * dx + dy * dy);
-                    if (distance < 2 * BALL_RADIUS)
-                    {
-                        // 发生碰撞，调整位置
-                        float angle = std::atan2(dy, dx);
-                        newX = balls[j].x + 2 * BALL_RADIUS * std::cos(angle);
-                        newY = balls[j].y + 2 * BALL_RADIUS * std::sin(angle);
-                    }
-                }
-            }
         }
 
         b->x = newX;
         b->y = newY;
-    }
-
-    for (int i = 0; i < DOTS; i++)
-    {
-        draw_point(balls[i].x, balls[i].y, 1);
+        draw_point(b->x, b->y, 1);
     }
 }
