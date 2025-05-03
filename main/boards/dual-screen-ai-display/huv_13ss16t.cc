@@ -9,6 +9,7 @@
 #include "huv_13ss16t.h"
 #include "string.h"
 #include "math.h"
+#include "settings.h"
 
 #define TAG "HUV_13SS16T"
 // 0x00-0x0D 原始数据，可带最多9*13参数，地址自增
@@ -87,20 +88,16 @@ void HUV_13SS16T::init_task()
         [](void *arg)
         {
             int count = 0;
-            float raw_acce_x;
-            float raw_acce_y;
-            float raw_acce_z;
             HUV_13SS16T *vfd = static_cast<HUV_13SS16T *>(arg);
+
+            Settings settings("subdisplay", false);
+            vfd->set_fonttype(settings.GetInt("fonttype", 0));
             vfd->initialize_points();
             vfd->initSnake(&vfd->snake);
             vfd->initFood(&vfd->food, &vfd->snake);
             while (true)
             {
-                if (vfd->acceCallback != nullptr)
-                {
-                    vfd->acceCallback(vfd->handle_, &raw_acce_x, &raw_acce_y, &raw_acce_z);
-                    vfd->liquid_pixels(raw_acce_x, raw_acce_y, raw_acce_z);
-                }
+                vfd->symnbol_progress();
                 // vfd->clear_point();
                 // for (size_t i = 0; i < MAX_X; i++)
                 // {
@@ -360,12 +357,28 @@ void HUV_13SS16T::time_blink()
     time_mark = !time_mark;
 }
 
-void HUV_13SS16T::set_fonttype(int index)
+void HUV_13SS16T::set_fonttype(int index, bool needsave)
 {
 #if USE_MUTI_FONTS
-    ESP_LOGI(TAG, "fonttype: %d", index % 6);
-    hex_codes = hex_codes_map[index % 6];
+    fonttype_ = index % 6;
+    ESP_LOGI(TAG, "fonttype: %d", fonttype_);
+    hex_codes = hex_codes_map[fonttype_];
+    for (size_t i = 0; i < PIXEL_COUNT; i++)
+    {
+        currentPixelData[i].need_update = true;
+    }
+    if (needsave)
+    {
+        Settings settings("subdisplay", true);
+        settings.SetInt("fonttype", fonttype_);
+    }
+
 #endif
+}
+
+int HUV_13SS16T::get_fonttype()
+{
+    return fonttype_;
 }
 
 void HUV_13SS16T::clear_point()
@@ -429,14 +442,10 @@ void HUV_13SS16T::matrix_write(const uint8_t *code)
     write_data8(temp_gram, MAX_X * MAX_Y + 1);
 }
 
-void HUV_13SS16T::icon_write(Symbols icon, bool en)
+void HUV_13SS16T::symbol_helper(Symbols symbol_)
 {
-    uint8_t temp_gram[1 + 2];
-    temp_gram[0] = 0x60;
-    temp_gram[1] = (uint8_t)icon;
-    temp_gram[2] = en;
-
-    write_data8(temp_gram, 3);
+    ESP_LOGI(TAG, "symbol_: %d", symbol_);
+    symbol = symbol_;
 }
 
 void HUV_13SS16T::dimming_write(int val)
@@ -541,48 +550,11 @@ void HUV_13SS16T::noti_show(const char *str, int timeout)
 
 void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 {
-    static int64_t start_time = esp_timer_get_time() / 1000;
     float dx = AcX + 0.094727f;
     float dy = AcY;
 
     dx = std::round(dx * 10) / 10;
     dy = std::round(dy * 10) / 10;
-
-    int64_t current_time = esp_timer_get_time() / 1000;
-    int64_t elapsed_time = current_time - start_time;
-    if (dx == 0 || elapsed_time < 200)
-    {
-        if (elapsed_time >= 200)
-            start_time = current_time;
-        else
-            return;
-        clear_point();
-        printBoard(&snake, &food);
-
-        autoTrackFood(&snake, &food);
-        moveSnake(&snake);
-
-        if (checkEat(&snake, &food))
-        {
-            initFood(&food, &snake);
-        }
-
-        if (checkCollision(&snake))
-        {
-            printf("Game Over!\n");
-            initSnake(&snake);
-            initFood(&food, &snake);
-        }
-        for (int i = 0; i < snake.length; i++)
-        {
-            balls[i].x = snake.body[i].x;
-            balls[i].y = snake.body[i].y;
-        }
-        balls[snake.length].x = food.x;
-        balls[snake.length].y = food.y;
-
-        return;
-    }
 
     clear_point();
 
@@ -594,7 +566,7 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
     dx *= 9.8f;
     dy *= 9.8f;
 
-    for (int i = 0; i < (snake.length + 1); i++)
+    for (int i = 0; i < activedots; i++)
     {
         Ball *b = &balls[i];
         // float prevVx = b->vx;
@@ -643,5 +615,122 @@ void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
         b->x = newX;
         b->y = newY;
         draw_point(b->x, b->y, 1);
+    }
+}
+
+void HUV_13SS16T::symnbol_progress()
+{
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+    int64_t elapsed_time = current_time - start_time;
+    float raw_acce_x;
+    float raw_acce_y;
+    float raw_acce_z;
+    static States laststates = states;
+
+    if (acceCallback != nullptr)
+    {
+        acceCallback(handle_, &raw_acce_x, &raw_acce_y, &raw_acce_z);
+        float dx = raw_acce_x + 0.1f;
+        float dy = raw_acce_y;
+
+        dx = std::round(dx * 10) / 10;
+        dy = std::round(dy * 10) / 10;
+        // ESP_LOGI(TAG, "dx: %f, elapsed_time: %d", dx, (int)elapsed_time);
+        if (dx == 0 || elapsed_time < 100)
+        {
+            states = Snake_;
+        }
+        else
+            states = Liquid;
+    }
+    else
+        states = Snake_;
+
+    if (symbol != Idle && states != Liquid)
+    {
+        states = Symbol;
+    }
+
+    if (laststates != states)
+    {
+        switch (laststates)
+        {
+        case States::Snake_:
+            for (int i = 0; i < snake.length; i++)
+            {
+                balls[i].x = snake.body[i].x;
+                balls[i].y = snake.body[i].y;
+            }
+            balls[snake.length].x = food.x;
+            balls[snake.length].y = food.y;
+            activedots = (snake.length + 1);
+            break;
+        case States::Liquid:
+
+            break;
+        case States::Symbol:
+            int pointcount = 0;
+            for (size_t j = 0; j < 8; j++)
+            {
+                for (size_t i = 0; i < 10; i++)
+                {
+                    if ((symbol_hex_codes[symbol][i] >> j) & 1)
+                    {
+                        if (pointcount < MAXDOTS)
+                        {
+                            balls[pointcount].x = i;
+                            balls[pointcount].y = j;
+                            pointcount++;
+                        }
+                    }
+                }
+            }
+            activedots = pointcount;
+            // ESP_LOGI(TAG, "dx: %d", pointcount);
+            break;
+        }
+        laststates = states;
+    }
+
+    switch (states)
+    {
+    case States::Snake_:
+        if (elapsed_time >= 200)
+            start_time = current_time;
+        else
+            return;
+        clear_point();
+        printBoard(&snake, &food);
+
+        autoTrackFood(&snake, &food);
+        moveSnake(&snake);
+
+        if (checkEat(&snake, &food))
+        {
+            initFood(&food, &snake);
+        }
+
+        if (checkCollision(&snake))
+        {
+            printf("Game Over!\n");
+            initSnake(&snake);
+            initFood(&food, &snake);
+        }
+        break;
+    case States::Liquid:
+        liquid_pixels(raw_acce_x, raw_acce_y, raw_acce_z);
+        break;
+    case States::Symbol:
+        clear_point();
+        for (size_t i = 0; i < 10; i++)
+        {
+            for (size_t j = 0; j < 8; j++)
+            {
+                if ((symbol_hex_codes[symbol][i] >> j) & 1)
+                    draw_point(i, j, 1);
+            }
+        }
+        break;
     }
 }

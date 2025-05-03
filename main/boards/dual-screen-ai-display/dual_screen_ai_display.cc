@@ -778,13 +778,14 @@ public:
 
     void SetSubContent(const char *content)
     {
-        // pixel_show(0, content);
-        noti_show(content, 5000);
+        int len = strlen(content);
+        noti_show(content, len * 300);
     }
 
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
-        noti_show(content.c_str(), timeout);
+        int len = content.size();
+        noti_show(content.c_str(), len * 300);
     }
 
     void SetSubSleep(bool en = true)
@@ -804,26 +805,35 @@ public:
         switch (device_state)
         {
         case kDeviceStateStarting:
+            symbol_helper(Symbols::Idle);
             break;
         case kDeviceStateWifiConfiguring:
+            symbol_helper(Symbols::Wifi);
             break;
         case kDeviceStateIdle:
+            symbol_helper(Symbols::Idle);
             break;
         case kDeviceStateConnecting:
+            symbol_helper(Symbols::Wifi);
             break;
         case kDeviceStateListening:
             if (app.IsVoiceDetected())
             {
+                symbol_helper(Symbols::Mic);
             }
             else
             {
+                symbol_helper(Symbols::MicNoSound);
             }
             break;
         case kDeviceStateSpeaking:
+            symbol_helper(Symbols::Speak);
             break;
         case kDeviceStateUpgrading:
+            symbol_helper(Symbols::Upgrade);
             break;
         case kDeviceStateActivating:
+            symbol_helper(Symbols::Idle);
             break;
         default:
             ESP_LOGE(TAG, "Invalid led strip event: %d", device_state);
@@ -968,7 +978,7 @@ private:
                 GetBacklight()->SetBrightness(0);
                 display_->SetSleep(true);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+                if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
                 {
                     ESP_LOGI(TAG, "Disable amoled power");
                     gpio_set_level(PIN_NUM_LCD_POWER, 0);
@@ -1098,6 +1108,7 @@ private:
         // #endif
         //                                });
 
+#if SUB_DISPLAY_EN && HUV_13SS16T_EN
         touch_button_->OnClick([this]()
                                {
             power_save_timer_->WakeUp();
@@ -1106,6 +1117,29 @@ private:
                 ResetWifiConfiguration();
             }
             app.ToggleChatState(); });
+        touch_button_->OnLongPress([this]()
+                                   {
+                power_save_timer_->WakeUp();
+                display_->set_fonttype(display_->get_fonttype() + 1,true); });
+#else
+        touch_button_->OnClick([this]()
+                               {
+            power_save_timer_->WakeUp();
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                ResetWifiConfiguration();
+            }
+            app.ToggleChatState(); });
+        touch_button_->OnLongPress([this]()
+                                   {
+        float voltage = 0.0f, current = 0.0f;
+        for (size_t i = 0; i < 3; i++)
+        {
+            voltage = ina3221->getBusVoltage(i);
+            current = ina3221->getCurrent(i);
+            ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
+        } });
+#endif
     }
 
 #if AMOLED_191
@@ -1901,13 +1935,55 @@ public:
         else
             charging = false;
 
-        // float voltage = 0.0f, current = 0.0f;
-        // for (size_t i = 0; i < 3; i++)
-        // {
-        //     voltage = ina3221->getBusVoltage(i);
-        //     current = ina3221->getCurrent(i);
-        //     ESP_LOGI(TAG, "channel: %s, voltage: %dmV, current: %dmA", DectectCHEnum[i], (int)(voltage * 1000), (int)(current * 1000));
-        // }
+        float usb_vol = ina3221->getBusVoltage(VCC_PW);
+        if (usb_vol < 4.1f)
+        {
+            mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
+            display_->SetSleep(true);
+            GetBacklight()->SetBrightness(0);
+            display_->SetChatMessage("system", "usb power too less");
+            ESP_LOGW(TAG, "usb power too less");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+#if ESP_DUAL_DISPLAY_V2
+            pcf8574->writeGpio(MIC_EN, 0);
+            pcf8574->writeGpio(OLED_EN, 0);
+            pcf8574->writeGpio(VFD_EN, 0);
+            pcf8574->writeGpio(SD_EN, 0);
+            pcf8574->writeGpio(TPS_PS, 0);
+#endif
+            if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
+            {
+                ESP_LOGI(TAG, "Disable amoled power");
+                gpio_set_level(PIN_NUM_LCD_POWER, 0);
+            }
+
+            if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+            {
+                ESP_LOGI(TAG, "Disable VFD power");
+                gpio_set_level(PIN_NUM_VFD_EN, 0);
+            }
+
+            if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
+            {
+                ESP_LOGI(TAG, "Disable force power");
+                gpio_set_level(PIN_NUM_POWER_EN, 0);
+            }
+            i2c_bus_delete(&i2c_bus);
+#if ESP_DUAL_DISPLAY_V2
+            rtc_gpio_pullup_en(TOUCH_INT_NUM);
+            rtc_gpio_pullup_en(WAKE_INT_NUM);
+            rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+            esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM) | (1 << TOUCH_BUTTON_GPIO), ESP_EXT1_WAKEUP_ANY_LOW);
+            // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
+            // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
+#else
+            rtc_gpio_pullup_en(TOUCH_INT_NUM);
+            esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+#endif
+            // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+            // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
+            esp_deep_sleep_start();
+        }
 #else
         static int last_level = 0;
         static bool last_charging = false;

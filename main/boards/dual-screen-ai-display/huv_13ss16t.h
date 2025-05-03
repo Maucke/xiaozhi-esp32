@@ -11,7 +11,7 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 
-#define USE_MUTI_FONTS false
+#define USE_MUTI_FONTS true
 // uint8_t reverseBits0To6(uint8_t byte)
 // {
 //     uint8_t bit7 = byte & 0x80;
@@ -711,10 +711,33 @@ public:
         0x6e, // Y
         0x5b  // Z
     };
+
+    const uint8_t symbol_hex_codes[6][10] = {
+        {0x00, 0x38, 0x40, 0x5E, 0x52, 0x52, 0x5E, 0x40, 0x38, 0x00}, // Mic without sound
+        {0x00, 0x38, 0x40, 0x5E, 0x5E, 0x5E, 0x5E, 0x40, 0x38, 0x00}, // Mic
+        {0x00, 0x3C, 0x3C, 0x3C, 0x7E, 0x7E, 0x00, 0x42, 0x3C, 0x00}, // Speak
+        {0x00, 0x04, 0x12, 0x0A, 0x2A, 0x2A, 0x0A, 0x12, 0x04, 0x00}, // Wifi
+        {0x00, 0x00, 0x88, 0x8C, 0xBE, 0xBE, 0x8C, 0x88, 0x00, 0x00}, // Upgrade
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // Idle
+    };
+
     typedef enum
     {
+        MicNoSound,
+        Mic,
+        Speak,
+        Wifi,
+        Upgrade,
+        Idle,
         Max
     } Symbols;
+
+    typedef enum
+    {
+        Snake_,
+        Liquid,
+        Symbol
+    } States;
 
     typedef enum
     {
@@ -736,11 +759,11 @@ public:
         NumAni animation_type;
         bool need_update;
     } ContentData;
+    States states = Snake_;
 
+    void symbol_helper(Symbols symbol_);
 #define BUFFER_SIZE 256
 #define DISPLAY_SIZE 8
-#define DOTS 20
-    const float BALL_RADIUS = 1.0f;
 
     typedef struct
     {
@@ -751,6 +774,7 @@ public:
 
     HUV_13SS16T(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
     HUV_13SS16T(spi_device_handle_t spi_device);
+    void symnbol_progress();
     void test();
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
@@ -758,7 +782,8 @@ public:
     void liquid_pixels(float AcX, float AcY, float AcZ);
     void pixelhelper(int index, uint8_t *code);
     void time_blink();
-    void set_fonttype(int index);
+    void set_fonttype(int index, bool needsave = false);
+    int get_fonttype();
     void clear_point();
     void draw_point(int x, int y, uint8_t dot);
 
@@ -779,7 +804,11 @@ private:
         bool isBorder;
     } Ball;
 
-    Ball balls[DOTS];
+    Symbols symbol = Idle;
+#define MAXDOTS 20
+    const float BALL_RADIUS = 1.0f;
+    int activedots = 1;
+    Ball balls[MAXDOTS];
     float getRandomBounceLoss(float base, float range)
     {
         return base + (float)std::rand() / RAND_MAX * range;
@@ -801,7 +830,7 @@ private:
     uint8_t pixel_gram[5 * PIXEL_COUNT] = {0};
     uint8_t matrix_gram[MAX_X][MAX_Y] = {0};
     CircularBuffer *cb = new CircularBuffer();
-
+    int fonttype_ = 0;
     void init_task();
     void pixelanimate();
     void refrash();
@@ -814,7 +843,7 @@ private:
     uint8_t find_num_hex_code(char ch);
     void initialize_points()
     {
-        for (int i = 0; i < DOTS; i++)
+        for (int i = 0; i < MAXDOTS; i++)
         {
             balls[i].x = rand() % MAX_X;
             balls[i].y = rand() % MAX_Y;
@@ -827,7 +856,6 @@ protected:
     void pixel_write(int x, int y, const uint8_t *code, int len);
     void pixel_write(int x, int y, const char *ascii, int len);
     void matrix_write(const uint8_t *code);
-    void icon_write(Symbols icon, bool en);
     void dimming_write(int val);
 
 #define COLS 10
