@@ -505,6 +505,16 @@ void HUV_13SS16T::display_buffer()
 }
 void HUV_13SS16T::scroll_buffer()
 {
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+
+    int64_t elapsed_time = current_time - start_time;
+
+    if (elapsed_time >= 100)
+        start_time = current_time;
+    else
+        return;
+
     if (cb->length > DISPLAY_SIZE)
     {
         cb->start_pos = (cb->start_pos + 1) % cb->length;
@@ -633,11 +643,13 @@ void HUV_13SS16T::symnbol_progress()
         acceCallback(handle_, &raw_acce_x, &raw_acce_y, &raw_acce_z);
         float dx = raw_acce_x + 0.1f;
         float dy = raw_acce_y;
+        float dz = raw_acce_z;
 
         dx = std::round(dx * 10) / 10;
         dy = std::round(dy * 10) / 10;
-        // ESP_LOGI(TAG, "dx: %f, elapsed_time: %d", dx, (int)elapsed_time);
-        if (dx == 0 || elapsed_time < 100)
+        dz = std::round(dz * 10) / 10;
+        // ESP_LOGI(TAG, "dx: %f,dy: %f,dz: %f", dx, dy, dz);
+        if ((dx == 0 && dy == 1 && dz == 0) || elapsed_time < 150)
         {
             states = Snake_;
         }

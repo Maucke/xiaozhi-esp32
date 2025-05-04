@@ -108,6 +108,7 @@ st7796_lcd_init_cmd_t st7796_lcd_init_cmds[] = {
     {0xff, (uint8_t[]){0x22, 0x01, 0x00}, 3, 0},
     {0x00, (uint8_t[]){0x90}, 1, 0},
     {0xc1, (uint8_t[]){0x1e, 0x1e}, 2, 0},
+    {0x51, (uint8_t[]){0x00}, 1, 0},
     {0x00, (uint8_t[]){0x80}, 1, 0},
     {0xc0, (uint8_t[]){0x00, 0xf1, 0x00, 0x12, 0x00, 0x12, 0x00, 0xf1, 0x00, 0x12, 0x00, 0x12}, 12, 0},
     {0x00, (uint8_t[]){0x90}, 1, 0},
@@ -313,7 +314,7 @@ public:
 
     void SetBrightnessImpl(uint8_t brightness) override
     {
-        // ESP_LOGI(TAG, "brightness: %d", brightness);
+        ESP_LOGI(TAG, "brightness: %d", brightness);
 #if SUB_DISPLAY_EN
         SetSubBacklight(brightness);
 #endif
@@ -1067,11 +1068,10 @@ private:
         pcf8574 = new PCF8574(i2c_bus);
         pcf8574->writeGpio(TPS_PS, 1);
         pcf8574->writeGpio(MIC_EN, 1);
-        pcf8574->writeGpio(OLED_EN, 1);
+        pcf8574->writeGpio(OLED_EN, 0);
+        pcf8574->writeGpio(OLED_RST, 0);
         pcf8574->writeGpio(VFD_EN, 0);
         pcf8574->writeGpio(SD_EN, 1);
-        vTaskDelay(pdMS_TO_TICKS(120));
-        pcf8574->writeGpio(VFD_EN, 1);
         ina3221 = new INA3221(i2c_bus);
         ESP_LOGD(TAG, "ina3221 begin: %d", ina3221->begin());
         float voltage = 0.0f, current = 0.0f;
@@ -1224,6 +1224,7 @@ private:
 
         *raw_acce_x = acce_value.acce_y;
         *raw_acce_y = acce_value.acce_z;
+        *raw_acce_z = acce_value.acce_x;
     }
 
     void InitializeDisplay()
@@ -1236,11 +1237,6 @@ private:
 
         // Log the initialization process
         ESP_LOGI(TAG, "Initialize VFD SPI bus");
-        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
-        {
-            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
-            gpio_set_level(PIN_NUM_VFD_RE, 1);
-        }
         // Set the clock and data pins for the SPI bus
         buscfg.sclk_io_num = PIN_NUM_VFD_PCLK;
         buscfg.data0_io_num = PIN_NUM_VFD_DATA0;
@@ -1321,11 +1317,9 @@ private:
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
 #endif
-#if ESP_DUAL_DISPLAY_V2
-        pcf8574->writeGpio(OLED_RST, 0);
-        vTaskDelay(pdMS_TO_TICKS(120));
+        pcf8574->writeGpio(OLED_EN, 1);
+        pcf8574->writeGpio(VFD_EN, 1);
         pcf8574->writeGpio(OLED_RST, 1);
-#endif
 #if AMOLED_191
         ESP_LOGI(TAG, "Initialize OLED QSPI bus");
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
@@ -1540,7 +1534,13 @@ private:
             gpio_set_direction(PIN_NUM_VFD_EN, GPIO_MODE_OUTPUT);
             gpio_set_level(PIN_NUM_VFD_EN, 1);
         }
-        GetBacklight()->SetBrightness(0);
+
+        if (PIN_NUM_VFD_RE != GPIO_NUM_NC)
+        {
+            gpio_set_direction(PIN_NUM_VFD_RE, GPIO_MODE_OUTPUT);
+            gpio_set_level(PIN_NUM_VFD_RE, 1);
+        }
+        GetBacklight()->SetBrightness(1);
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -1935,54 +1935,57 @@ public:
         else
             charging = false;
 
-        float usb_vol = ina3221->getBusVoltage(VCC_PW);
-        if (usb_vol < 4.1f)
+        if (!discharging)
         {
-            mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
-            display_->SetSleep(true);
-            GetBacklight()->SetBrightness(0);
-            display_->SetChatMessage("system", "usb power too less");
-            ESP_LOGW(TAG, "usb power too less");
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            float usb_vol = ina3221->getBusVoltage(VCC_PW);
+            if (usb_vol < 4.1f)
+            {
+                mpu6050_sleep(mpu6050_); // deactive the mpu, because its lost power to fast
+                display_->SetSleep(true);
+                GetBacklight()->SetBrightness(0);
+                display_->SetChatMessage("system", "usb power too less");
+                ESP_LOGW(TAG, "usb power too less");
+                vTaskDelay(pdMS_TO_TICKS(2000));
 #if ESP_DUAL_DISPLAY_V2
-            pcf8574->writeGpio(MIC_EN, 0);
-            pcf8574->writeGpio(OLED_EN, 0);
-            pcf8574->writeGpio(VFD_EN, 0);
-            pcf8574->writeGpio(SD_EN, 0);
-            pcf8574->writeGpio(TPS_PS, 0);
+                pcf8574->writeGpio(MIC_EN, 0);
+                pcf8574->writeGpio(OLED_EN, 0);
+                pcf8574->writeGpio(VFD_EN, 0);
+                pcf8574->writeGpio(SD_EN, 0);
+                pcf8574->writeGpio(TPS_PS, 0);
 #endif
-            if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
-            {
-                ESP_LOGI(TAG, "Disable amoled power");
-                gpio_set_level(PIN_NUM_LCD_POWER, 0);
-            }
+                if (PIN_NUM_LCD_POWER != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable amoled power");
+                    gpio_set_level(PIN_NUM_LCD_POWER, 0);
+                }
 
-            if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
-            {
-                ESP_LOGI(TAG, "Disable VFD power");
-                gpio_set_level(PIN_NUM_VFD_EN, 0);
-            }
+                if (PIN_NUM_VFD_EN != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable VFD power");
+                    gpio_set_level(PIN_NUM_VFD_EN, 0);
+                }
 
-            if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
-            {
-                ESP_LOGI(TAG, "Disable force power");
-                gpio_set_level(PIN_NUM_POWER_EN, 0);
-            }
-            i2c_bus_delete(&i2c_bus);
+                if (PIN_NUM_POWER_EN != GPIO_NUM_NC)
+                {
+                    ESP_LOGI(TAG, "Disable force power");
+                    gpio_set_level(PIN_NUM_POWER_EN, 0);
+                }
+                i2c_bus_delete(&i2c_bus);
 #if ESP_DUAL_DISPLAY_V2
-            rtc_gpio_pullup_en(TOUCH_INT_NUM);
-            rtc_gpio_pullup_en(WAKE_INT_NUM);
-            rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
-            esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM) | (1 << TOUCH_BUTTON_GPIO), ESP_EXT1_WAKEUP_ANY_LOW);
-            // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
-            // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
+                rtc_gpio_pullup_en(TOUCH_INT_NUM);
+                rtc_gpio_pullup_en(WAKE_INT_NUM);
+                rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM) | (1 << TOUCH_BUTTON_GPIO), ESP_EXT1_WAKEUP_ANY_LOW);
+                // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
+                // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
 #else
-            rtc_gpio_pullup_en(TOUCH_INT_NUM);
-            esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
+                rtc_gpio_pullup_en(TOUCH_INT_NUM);
+                esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
 #endif
-            // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
-            // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
-            esp_deep_sleep_start();
+                // rtc_gpio_pullup_en(TOUCH_BUTTON_GPIO);
+                // esp_sleep_enable_ext0_wakeup(TOUCH_BUTTON_GPIO, 0);
+                esp_deep_sleep_start();
+            }
         }
 #else
         static int last_level = 0;
@@ -2246,11 +2249,11 @@ public:
         char time_str[11];
         static bool blink = false;
         if (blink)
-            strftime(time_str, sizeof(time_str), "%H:%M:%S", &time_user);
+            strftime(time_str, sizeof(time_str), " %H:%M:%S ", &time_user);
         else
-            strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
+            strftime(time_str, sizeof(time_str), " %H %M %S ", &time_user);
         blink = !blink;
-        display_->content_show(1, time_str, 8, false, BOE_48_1504FN::UP2DOWN);
+        display_->content_show(0, time_str, 10, false, BOE_48_1504FN::UP2DOWN);
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN
         static struct tm time_user;
         time_t now = time(NULL);

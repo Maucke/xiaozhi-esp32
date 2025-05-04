@@ -664,6 +664,16 @@ void FTB_BT_247GN::display_buffer()
 }
 void FTB_BT_247GN::scroll_buffer()
 {
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+
+    int64_t elapsed_time = current_time - start_time;
+
+    if (elapsed_time >= 100)
+        start_time = current_time;
+    else
+        return;
+
     if (cb->length_top > DISPLAY_SIZE)
     {
         cb->start_pos_top = (cb->start_pos_top + 1) % cb->length_top;

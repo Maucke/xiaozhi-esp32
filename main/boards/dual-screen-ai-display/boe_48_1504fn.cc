@@ -446,6 +446,16 @@ void BOE_48_1504FN::display_buffer()
 }
 void BOE_48_1504FN::scroll_buffer()
 {
+    static int64_t start_time = esp_timer_get_time() / 1000;
+    int64_t current_time = esp_timer_get_time() / 1000;
+
+    int64_t elapsed_time = current_time - start_time;
+
+    if (elapsed_time >= 100)
+        start_time = current_time;
+    else
+        return;
+
     if (cb->length > DISPLAY_SIZE)
     {
         cb->start_pos = (cb->start_pos + 1) % cb->length;
@@ -537,8 +547,10 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
 
     symbolhelper(L_0_0, false);
     symbolhelper(L_1_0, false);
+    symbolhelper(L_2_0, false);
     symbolhelper(R_0_0, false);
     symbolhelper(R_1_0, false);
+    symbolhelper(R_2_0, false);
 
     for (size_t i = 0; i < 14; i++)
     {
@@ -561,24 +573,28 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
         {
             if (level_sum > 10)
                 symbolhelper(L_0_0, true);
-            if (level_sum > 30)
+            if (level_sum > 20)
                 symbolhelper(L_1_0, true);
-            if (level_sum > 50)
-                symbolhelper(bar_L_3[(i + count) % 14], true);
+            if (level_sum > 30)
+                symbolhelper(L_2_0, true);
+            if (level_sum > 40)
+                symbolhelper(bar_L_3[(i / 2 + count) % 14], true);
             if (level_sum > 75)
-                symbolhelper(bar_L_4[(i + count) % 14], true);
+                symbolhelper(bar_L_4[(i / 2 + count) % 14], true);
         }
         else
         {
             if (level_sum > 10)
                 symbolhelper(R_0_0, true);
-            if (level_sum > 30)
+            if (level_sum > 20)
                 symbolhelper(R_1_0, true);
-            if (level_sum > 50)
-                symbolhelper(bar_R_3[(i + count) % 14], true);
+            if (level_sum > 30)
+                symbolhelper(R_2_0, true);
+            if (level_sum > 40)
+                symbolhelper(bar_R_3[(i / 2 + count) % 14], true);
             if (level_sum > 75)
-                symbolhelper(bar_R_4[(i + count) % 14], true);
+                symbolhelper(bar_R_4[(i / 2 + count) % 14], true);
         }
     }
-    count++;
+    // count++;
 }
