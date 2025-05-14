@@ -1213,6 +1213,8 @@ private:
 
     static void mpu6050GetAcceleration(void *handle, float *raw_acce_x, float *raw_acce_y, float *raw_acce_z)
     {
+        auto display = (CustomLcdDisplay *)Board::GetInstance().GetDisplay();
+        char tempstr[20] = {0};
         mpu6050_handle_t mpu6050 = (mpu6050_handle_t)handle;
         // mpu6050_raw_acce_value_t raw_acce;
         // mpu6050_get_raw_acce(mpu6050, &raw_acce);
@@ -1225,6 +1227,18 @@ private:
         *raw_acce_x = acce_value.acce_y;
         *raw_acce_y = acce_value.acce_z;
         *raw_acce_z = acce_value.acce_x;
+
+        // ESP_LOGI(TAG, "dx: %f,dy: %f,dz: %f", *raw_acce_x, *raw_acce_y, *raw_acce_z);
+        if (display->noti_busy())
+            return;
+        if (*raw_acce_y < 0.7f)
+        {
+            if (*raw_acce_x > 0.0f)
+                sprintf(tempstr, "temp:%.1fc", Board::GetInstance().GetTemperature());
+            else
+                sprintf(tempstr, "baro:%.1f hPa", Board::GetInstance().GetBarometer());
+            display->noti_show(tempstr, 10000);
+        }
     }
 
     void InitializeDisplay()
@@ -1317,10 +1331,12 @@ private:
         // Add the PT6324 device to the SPI bus with the specified configuration
         ESP_ERROR_CHECK(spi_bus_add_device(VFD_HOST, &devcfg, &spi_device));
 #endif
+#if ESP_DUAL_DISPLAY_V2
         pcf8574->writeGpio(OLED_EN, 1);
         pcf8574->writeGpio(VFD_EN, 1);
         pcf8574->writeGpio(OLED_RST, 1);
         vTaskDelay(pdMS_TO_TICKS(120));
+#endif
 #if AMOLED_191
         ESP_LOGI(TAG, "Initialize OLED QSPI bus");
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
@@ -2268,6 +2284,7 @@ public:
             strftime(time_str, sizeof(time_str), "%H %M %S", &time_user);
         blink = !blink;
         display_->pixel_show(0, time_str, 8, false, HUV_13SS16T::UP2DOWN);
+
 #elif SUB_DISPLAY_EN && FTB_13_BT_247GN_EN
         static struct tm time_user;
         time_t now = time(NULL);

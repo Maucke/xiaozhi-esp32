@@ -795,6 +795,7 @@ public:
     }
     void noti_show(const char *str, int timeout);
     void pixel_show(int start, const char *buf, int size, bool forceupdate = false, NumAni ani = LEFT2RT);
+    bool noti_busy();
 
 private:
     typedef struct
@@ -836,6 +837,7 @@ private:
     void refrash();
     void display_buffer();
     void scroll_buffer();
+
 
     uint8_t contentgetpart(uint8_t raw, uint8_t before_raw, uint8_t mask);
     void write_data8(uint8_t *dat, int len);

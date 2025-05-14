@@ -233,6 +233,7 @@ void HUV_13SS16T::pixelanimate()
                 currentPixelData[i].current_content = tempPixelData[i].current_content;
                 currentPixelData[i].need_update = true;
             }
+            hex_codes = hex_codes_map[fonttype_];
             content_inhibit_time = 0;
         }
     }
@@ -497,6 +498,7 @@ void HUV_13SS16T::display_buffer()
             {
                 currentPixelData[i].current_content = display[i];
                 currentPixelData[i].animation_type = LEFT2RT;
+                currentPixelData[i].need_update = true;
             }
 
             // ESP_LOGI(TAG, "%s", display);
@@ -521,8 +523,17 @@ void HUV_13SS16T::scroll_buffer()
     }
 }
 
+bool HUV_13SS16T::noti_busy()
+{
+    if (content_inhibit_time != 0)
+        return true;
+    else
+        return false;
+}
+
 void HUV_13SS16T::noti_show(const char *str, int timeout)
 {
+    hex_codes = hex_codes_map[0];
     content_inhibit_time = esp_timer_get_time() / 1000 + timeout;
     int str_len = strlen(str);
     if (str_len > BUFFER_SIZE)
