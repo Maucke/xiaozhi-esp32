@@ -1320,6 +1320,7 @@ private:
         pcf8574->writeGpio(OLED_EN, 1);
         pcf8574->writeGpio(VFD_EN, 1);
         pcf8574->writeGpio(OLED_RST, 1);
+        vTaskDelay(pdMS_TO_TICKS(120));
 #if AMOLED_191
         ESP_LOGI(TAG, "Initialize OLED QSPI bus");
         buscfg.sclk_io_num = PIN_NUM_LCD_PCLK;
@@ -2252,6 +2253,7 @@ public:
             strftime(time_str, sizeof(time_str), " %H:%M:%S ", &time_user);
         else
             strftime(time_str, sizeof(time_str), " %H %M %S ", &time_user);
+        display_->symbolhelper(BOE_48_1504FN::LD_CLOCK, blink);
         blink = !blink;
         display_->content_show(0, time_str, 10, false, BOE_48_1504FN::UP2DOWN);
 #elif SUB_DISPLAY_EN && HUV_13SS16T_EN

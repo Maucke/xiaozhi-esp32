@@ -545,6 +545,81 @@ void BOE_48_1504FN::spectrum_show(float *buf, int size)
     if (fft_level_r > 85)
         symbolhelper(LD_4_0, true);
 
+    symbolhelper(LD_1, false);
+    symbolhelper(LD_2, false);
+    symbolhelper(LD_3, false);
+    symbolhelper(LD_4, false);
+    symbolhelper(LD_5, false);
+    symbolhelper(LD_6, false);
+
+    if (fft_level_l > 5)
+        symbolhelper(LD_1, true);
+    if (fft_level_l > 20)
+        symbolhelper(LD_2, true);
+    if (fft_level_l > 40)
+        symbolhelper(LD_3, true);
+    if (fft_level_l > 60)
+        symbolhelper(LD_4, true);
+    if (fft_level_l > 80)
+        symbolhelper(LD_5, true);
+    if (fft_level_l > 90)
+        symbolhelper(LD_6, true);
+
+    symbolhelper(RD_1_CIRCLE, false);
+    symbolhelper(RD_2_CIRCLE, false);
+    symbolhelper(RD_3_CIRCLE, false);
+    symbolhelper(RD_1_P1, false);
+    symbolhelper(RD_2_P1, false);
+    symbolhelper(RD_3_P1, false);
+    symbolhelper(RD_1_P2, false);
+    symbolhelper(RD_2_P2, false);
+    symbolhelper(RD_3_P2, false);
+    symbolhelper(RD_1, false);
+    symbolhelper(RD_2, false);
+    symbolhelper(RD_3, false);
+
+    if (fft_level_l > 20)
+        symbolhelper(RD_1_CIRCLE, true);
+    if (fft_level_l > 50)
+        symbolhelper(RD_2_CIRCLE, true);
+    if (fft_level_l > 80)
+        symbolhelper(RD_3_CIRCLE, true);
+
+    if (fft_level_r > 5)
+        symbolhelper(RD_1, true);
+    if (fft_level_r > 15)
+        symbolhelper(RD_1_P1, true);
+    if (fft_level_r > 25)
+        symbolhelper(RD_1_P2, true);
+    if (fft_level_r > 35)
+        symbolhelper(RD_2, true);
+    if (fft_level_r > 45)
+        symbolhelper(RD_2_P1, true);
+    if (fft_level_r > 55)
+        symbolhelper(RD_2_P2, true);
+    if (fft_level_r > 65)
+        symbolhelper(RD_3, true);
+    if (fft_level_r > 75)
+        symbolhelper(RD_3_P1, true);
+    if (fft_level_r > 85)
+        symbolhelper(RD_3_P2, true);
+
+    symbolhelper(LD_KARAOKE, false);
+    if (fft_level_l > 20)
+        symbolhelper(LD_KARAOKE, true);
+
+    symbolhelper(LD_DTS, false);
+    if (fft_level_r > 20)
+        symbolhelper(LD_DTS, true);
+
+    symbolhelper(D_MUSIC_L, true);
+    symbolhelper(D_MUSIC, false);
+    if (fft_level_r > 40)
+        symbolhelper(D_MUSIC, true);
+    symbolhelper(D_MP3OPT, false);
+    if (fft_level_l > 40)
+        symbolhelper(D_MP3OPT, true);
+
     symbolhelper(L_0_0, false);
     symbolhelper(L_1_0, false);
     symbolhelper(L_2_0, false);
