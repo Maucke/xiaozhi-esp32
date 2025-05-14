@@ -17,9 +17,8 @@ class Display;
 class Board
 {
 private:
-    Board(const Board &) = delete;            // 禁用拷贝构造函数
-    Board &operator=(const Board &) = delete; // 禁用赋值操作
-    virtual std::string GetBoardJson() = 0;
+    Board(const Board&) = delete; // 禁用拷贝构造函数
+    Board& operator=(const Board&) = delete; // 禁用赋值操作
 
 protected:
     Board();
@@ -57,6 +56,7 @@ public:
     virtual bool CalibrateTime(struct tm *tm_info);
     virtual std::string GetJson();
     virtual void SetPowerSaveMode(bool enabled) = 0;
+    virtual std::string GetBoardJson() = 0;
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

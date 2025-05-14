@@ -1004,7 +1004,7 @@ private:
                 esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM) | (1 << WAKE_INT_NUM) | (1 << TOUCH_BUTTON_GPIO), ESP_EXT1_WAKEUP_ANY_LOW);
             // rtc_gpio_pulldown_en(PIN_NUM_VCC_DECT);
             // esp_sleep_enable_ext0_wakeup(PIN_NUM_VCC_DECT, 1);
-#else
+#elif USE_TOUCH
                 rtc_gpio_pullup_en(TOUCH_INT_NUM);
                 esp_sleep_enable_ext1_wakeup((1ULL << TOUCH_INT_NUM), ESP_EXT1_WAKEUP_ANY_LOW);
 #endif

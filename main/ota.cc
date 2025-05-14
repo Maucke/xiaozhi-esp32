@@ -23,7 +23,7 @@
 
 
 Ota::Ota() {
-    SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
+    SetCheckVersionUrl(CONFIG_OTA_URL);
 
 #ifdef ESP_EFUSE_BLOCK_USR_DATA
     // Read Serial Number from efuse user_data

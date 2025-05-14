@@ -10,14 +10,14 @@
 #define SUB_DISPLAY_EN 1
 #define FORD_VFD_EN 0
 #define HNA_16MM65T_EN 0
-#define BOE_48_1504FN_EN 01
+#define BOE_48_1504FN_EN 0
 #define FTB_13_BT_247GN_EN 0
-#define HUV_13SS16T_EN 0
+#define HUV_13SS16T_EN 01
 
 // 板子选择
 #define ESP_D103 0
-#define ESP_DUAL_DISPLAY 0
-#define ESP_DUAL_DISPLAY_V2 01
+#define ESP_DUAL_DISPLAY 01
+#define ESP_DUAL_DISPLAY_V2 0
 
 #define AMOLED_095 01
 #define AMOLED_191 0
@@ -141,7 +141,7 @@
 
 #endif
 
-#define USE_TOUCH 1
+#define USE_TOUCH 0
 #if USE_TOUCH
 #define TOUCH_MASTER_NUM I2C_NUM_1
 #define TOUCH_SDA_NUM GPIO_NUM_3
