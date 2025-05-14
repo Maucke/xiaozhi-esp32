@@ -141,7 +141,7 @@
 
 #endif
 
-#define USE_TOUCH 0
+#define USE_TOUCH 1
 #if USE_TOUCH
 #define TOUCH_MASTER_NUM I2C_NUM_1
 #define TOUCH_SDA_NUM GPIO_NUM_3
