@@ -1224,7 +1224,11 @@ private:
         mpu6050_acce_value_t acce_value;
         mpu6050_get_acce(mpu6050, &acce_value);
 
+#if ESP_DUAL_DISPLAY_V2
+        *raw_acce_x = -acce_value.acce_y;
+#else
         *raw_acce_x = acce_value.acce_y;
+#endif
         *raw_acce_y = acce_value.acce_z;
         *raw_acce_z = acce_value.acce_x;
 
@@ -1234,9 +1238,17 @@ private:
         if (*raw_acce_y < 0.7f)
         {
             if (*raw_acce_x > 0.0f)
-                sprintf(tempstr, "temp:%.1fc", Board::GetInstance().GetTemperature());
+                sprintf(tempstr, "Temp:%.1fc", Board::GetInstance().GetTemperature());
             else
-                sprintf(tempstr, "baro:%.1f hPa", Board::GetInstance().GetBarometer());
+#if ESP_DUAL_DISPLAY_V2
+            {
+                auto ina = ((DualScreenAIDisplay *)&Board::GetInstance())->ina3221;
+                auto pw = ina->getBusVoltage(VCC_PW) * ina->getCurrent(VCC_PW);
+                sprintf(tempstr, "Power:%.1f w", pw);
+            }
+#else
+                sprintf(tempstr, "Baro:%.1f hPa", Board::GetInstance().GetBarometer());
+#endif
             display->noti_show(tempstr, 10000);
         }
     }

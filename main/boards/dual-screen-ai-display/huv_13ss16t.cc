@@ -571,7 +571,7 @@ void HUV_13SS16T::noti_show(const char *str, int timeout)
 
 void HUV_13SS16T::liquid_pixels(float AcX, float AcY, float AcZ)
 {
-    float dx = AcX + 0.094727f;
+    float dx = AcX + 0.1f;
     float dy = AcY;
 
     dx = std::round(dx * 10) / 10;
@@ -660,7 +660,7 @@ void HUV_13SS16T::symnbol_progress()
         dy = std::round(dy * 10) / 10;
         dz = std::round(dz * 10) / 10;
         // ESP_LOGI(TAG, "dx: %f,dy: %f,dz: %f", dx, dy, dz);
-        if ((dx == 0 && dy == 1 && dz == 0) || elapsed_time < 150)
+        if ((dx <= 0.1f && dy >= 0.9f) || elapsed_time < 150)
         {
             states = Snake_;
         }
