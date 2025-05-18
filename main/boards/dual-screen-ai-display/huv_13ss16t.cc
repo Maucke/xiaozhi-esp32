@@ -660,11 +660,11 @@ void HUV_13SS16T::symnbol_progress()
         dy = std::round(dy * 10) / 10;
         dz = std::round(dz * 10) / 10;
         // ESP_LOGI(TAG, "dx: %f,dy: %f,dz: %f", dx, dy, dz);
-        if ((dx <= 0.1f && dy >= 0.9f) || elapsed_time < 150)
+        if (((dx <= 0.1f && dy >= 0.9f) || elapsed_time < 150) && states == Liquid)
         {
             states = Snake_;
         }
-        else
+        else if(states == Snake_ && dy < 0.8)
             states = Liquid;
     }
     else

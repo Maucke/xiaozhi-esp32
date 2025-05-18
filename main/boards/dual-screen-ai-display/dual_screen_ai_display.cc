@@ -1964,6 +1964,8 @@ public:
         else
             charging = false;
 
+        // ESP_LOGW(TAG, "charging: %d, discharging: %d", charging, discharging);
+
         if (!discharging)
         {
             float usb_vol = ina3221->getBusVoltage(VCC_PW);
