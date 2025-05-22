@@ -69,9 +69,10 @@ PT6302::PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t 
     ESP_ERROR_CHECK(spi_bus_add_device(spi_num, &devcfg, &spi_device_));
 }
 
-void PT6302::init()
+void PT6302::init(unsigned int gr)
 {
     write_mode(PT6302::Mode::NORMAL);
+    write_grnum(gr);
     write_dimming();
 }
 

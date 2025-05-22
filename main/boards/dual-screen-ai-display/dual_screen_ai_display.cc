@@ -102,6 +102,7 @@ typedef struct
 } st7796_vendor_config_t;
 
 st7796_lcd_init_cmd_t st7796_lcd_init_cmds[] = {
+    {0x11, (uint8_t[]){0x00}, 1, 120},
     {0x00, (uint8_t[]){0x00}, 1, 0},
     {0xff, (uint8_t[]){0x22, 0x01, 0x01, 0x00}, 4, 0},
     {0x00, (uint8_t[]){0x80}, 1, 0},
@@ -215,10 +216,10 @@ st7796_lcd_init_cmd_t st7796_lcd_init_cmds[] = {
     {0xE8, (uint8_t[]){0xFF, 0xA7, 0x9D, 0x94, 0xFF, 0x87, 0x70, 0x60, 0x4E, 0xFF, 0x44, 0x34, 0x23, 0x13, 0xFF, 0x02, 0xF2, 0xE1, 0xD0, 0xAB, 0xC0, 0xB0, 0xA0, 0x98, 0xAA, 0x90, 0x88, 0x80, 0x78, 0xAA, 0x74, 0x71, 0x70, 0x2A, 0xFF, 0x9A, 0x93, 0x89, 0xFF, 0x82, 0x69, 0x5A, 0x4A, 0xFF, 0x42, 0x32, 0x22, 0x12, 0xFF, 0x02, 0xF2, 0xE2, 0xD2, 0xAB, 0xC2, 0xB2, 0xA2, 0x9A, 0xAA, 0x92, 0x8A, 0x82, 0x7A, 0xAA, 0x76, 0x74, 0x73, 0x2A}, 64, 0},
     {0x00, (uint8_t[]){0x44}, 1, 0},
     {0xE8, (uint8_t[]){0xFF, 0x7A, 0x70, 0x65, 0xFF, 0x58, 0x3F, 0x2E, 0x1A, 0xFF, 0x11, 0xFE, 0xEA, 0xD9, 0xAB, 0xC6, 0xB4, 0xA2, 0x8C, 0xAA, 0x7A, 0x67, 0x55, 0x4C, 0xAA, 0x42, 0x38, 0x2E, 0x26, 0xAA, 0x1F, 0x1A, 0x19, 0x2A}, 34, 0},
-    {0x11, (uint8_t[]){0x00}, 0, 120},
+    // {0x11, (uint8_t[]){0x00}, 0, 120},
     {0x36, (uint8_t[]){0x23}, 1, 0},
     {0x3a, (uint8_t[]){0x05}, 1, 0},
-    {0x11, (uint8_t[]){0x00}, 0, 0},
+    // {0x11, (uint8_t[]){0x00}, 0, 0},
     {0x29, (uint8_t[]){0x00}, 0, 10},
     {0x06, (uint8_t[]){0x01}, 1, 0}};
 #endif
@@ -335,23 +336,16 @@ public:
         DisplayLockGuard lock(this);
         ESP_LOGI(TAG, "LCD sleep");
         uint8_t data[1] = {1};
-        int lcd_cmd = 0x10;
+        int lcd_cmd = 0x11;
+        if (en)
+            lcd_cmd = 0x10;
 #if AMOLED_191
         lcd_cmd &= 0xff;
         lcd_cmd <<= 8;
         lcd_cmd |= LCD_OPCODE_WRITE_CMD << 24;
 #elif AMOLED_095
 #endif
-        if (en)
-        {
-            data[0] = 1;
-            esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-        }
-        else
-        {
-            data[0] = 0;
-            esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, &data, sizeof(data));
-        }
+        esp_lcd_panel_io_tx_param(panel_io_, lcd_cmd, nullptr, 0);
 
 #if SUB_DISPLAY_EN
         SetSubSleep(en);
@@ -780,13 +774,13 @@ public:
     void SetSubContent(const char *content)
     {
         int len = strlen(content);
-        noti_show(content, len * 300);
+        noti_show(content, len * 300 + 3000);
     }
 
     virtual void Notification(const std::string &content, int timeout = 2000) override
     {
         int len = content.size();
-        noti_show(content.c_str(), len * 300);
+        noti_show(content.c_str(), len * 300 + 3000);
     }
 
     void SetSubSleep(bool en = true)
@@ -815,7 +809,7 @@ public:
             symbol_helper(Symbols::Idle);
             break;
         case kDeviceStateConnecting:
-            symbol_helper(Symbols::Wifi);
+            // symbol_helper(Symbols::Wifi);
             break;
         case kDeviceStateListening:
             if (app.IsVoiceDetected())
@@ -940,7 +934,7 @@ private:
 #endif
     void InitializePowerSaveTimer()
     {
-        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
+        power_save_timer_ = new PowerSaveTimer(-1, 300, 60);
         power_save_timer_->OnEnterSleepMode([this]()
                                             {
         ESP_LOGI(TAG, "Enabling sleep mode");
@@ -960,6 +954,9 @@ private:
         GetBacklight()->SetBrightness(1); });
         power_save_timer_->OnExitSleepMode([this]()
                                            {
+#if SUB_DISPLAY_EN && BOE_48_1504FN_EN
+                display_->symbolhelper(BOE_48_1504FN::SLEEP, false);
+#endif
         display_->SetChatMessage("system", "");
         display_->SetEmotion("neutral");
         display_->RestoreAutoDimming();

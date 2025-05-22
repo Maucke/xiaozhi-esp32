@@ -20,7 +20,7 @@
  */
 BOE_48_1504FN::BOE_48_1504FN(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num) : PT6302(din, clk, cs, spi_num)
 {
-    init();
+    init(GR_COUNT);
     init_task();
     ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
 }
@@ -39,7 +39,7 @@ BOE_48_1504FN::BOE_48_1504FN(spi_device_handle_t spi_device) : PT6302(spi_device
         ESP_LOGE(TAG, "VFD spi is null");
         return;
     }
-    init();
+    init(GR_COUNT);
     init_task();
     ESP_LOGI(TAG, "BOE_48_1504FN Initalized");
 }
@@ -48,15 +48,15 @@ void BOE_48_1504FN::refrash(Gram *gram)
 {
     if (gram == nullptr)
         return;
+    write_grnum(GR_COUNT);
+    write_dimming();
     write_cgram(0, gram->cgram, CGRAM_SIZE * 5);
     write_dcram(0, gram->number, DISPLAY_SIZE);
     write_adram(0, gram->symbol, GR_COUNT);
-    write_dimming();
 }
 
 void BOE_48_1504FN::init_task()
 {
-    write_grnum(GR_COUNT);
     const uint8_t values[5] = {
         0, 1, 2, 3, 4};
     write_dcram(10, (uint8_t *)values, 5);

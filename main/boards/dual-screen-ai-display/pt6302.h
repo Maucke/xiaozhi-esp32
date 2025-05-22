@@ -42,7 +42,8 @@ public:
 
     PT6302(gpio_num_t din, gpio_num_t clk, gpio_num_t cs, spi_host_device_t spi_num);
     PT6302(spi_device_handle_t spi_device) : spi_device_(spi_device) {}
-    void init();
+
+    void init(unsigned int gr);
     void setbrightness(uint8_t brightness);
     void setsleep(bool en);
     void test();
